@@ -13,6 +13,8 @@ const TEAM = [
     role: 'Full-Stack Developer',
     initials: 'BG',
     color: '#3730a3',
+    image: '/assets/aistudio/image_2439f431.png',
+    position: 'center 25%',
     bio: 'Passionate about making education accessible through technology. BCA student at Mechi Multiple Campus, TU.',
   },
   {
@@ -20,6 +22,8 @@ const TEAM = [
     role: 'UI/UX & Backend',
     initials: 'DT',
     color: '#059669',
+    image: '/assets/aistudio/20251216_094640_6ed35b8b.jpg',
+    position: 'center 46%',
     bio: 'Focused on intuitive design and scalable backend systems. BCA student at Mechi Multiple Campus, TU.',
   },
 ]
@@ -29,6 +33,8 @@ const SUPERVISOR = {
   role: 'Project Supervisor',
   initials: 'BG',
   color: '#f59e0b',
+  image: '/assets/aistudio/558843769_24796568323292938_8697520990670861040_n_fc26b9d9.jpg',
+  position: 'center 38%',
   institution: 'Mechi Multiple Campus, Tribhuvan University',
 }
 
@@ -60,10 +66,10 @@ const VALUES = [
 ]
 
 const TIMELINE = [
-  { year: '2024 Jan', label: 'Idea born', desc: 'Frustrated by expensive coaching and scattered notes, the team decided to build a solution.' },
-  { year: '2024 Jun', label: 'Design phase', desc: 'Wireframes, user research, and initial database schema designed.' },
-  { year: '2025 Jan', label: 'Development started', desc: 'Built with Next.js 15, Supabase, and Tailwind CSS v4.' },
-  { year: '2025 Aug', label: 'Launch', desc: 'VidyaSetu goes live — accessible to every student in Nepal.' },
+  { year: '2025 Jan', label: 'Idea born', desc: 'Frustrated by expensive coaching and scattered notes, the team decided to build a solution.' },
+  { year: '2025 Jun', label: 'Design phase', desc: 'Wireframes, user research, and initial database schema designed.' },
+  { year: '2026 Jan', label: 'Development started', desc: 'Built with Next.js 15, Supabase, and Tailwind CSS v4.' },
+  { year: '2026 Sep', label: 'Launch', desc: 'VidyaSetu goes live — accessible to every student in Nepal.' },
 ]
 
 export default function AboutPage() {
@@ -151,13 +157,22 @@ export default function AboutPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
           {TEAM.map(m => (
-            <div key={m.name} className="card p-6 flex gap-4">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0"
-                style={{ background: m.color }}>
-                {m.initials}
-              </div>
+            <div key={m.name} className="card p-6 flex gap-4 items-start">
+              {m.image ? (
+                <img
+                  src={m.image}
+                  alt={m.name}
+                  style={{ objectPosition: m.position }}
+                  className="w-16 h-16 rounded-2xl object-cover shadow-md ring-2 ring-indigo-500/20 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0"
+                  style={{ background: m.color }}>
+                  {m.initials}
+                </div>
+              )}
               <div>
-                <h3 className="font-bold text-slate-800 dark:text-slate-100">{m.name}</h3>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base">{m.name}</h3>
                 <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium mb-2">{m.role}</p>
                 <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{m.bio}</p>
               </div>
@@ -167,10 +182,19 @@ export default function AboutPage() {
 
         {/* Supervisor */}
         <div className="card p-6 flex gap-4 border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
-          <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0"
-            style={{ background: SUPERVISOR.color }}>
-            {SUPERVISOR.initials}
-          </div>
+          {SUPERVISOR.image ? (
+            <img
+              src={SUPERVISOR.image}
+              alt={SUPERVISOR.name}
+              style={{ objectPosition: SUPERVISOR.position }}
+              className="w-16 h-16 rounded-full object-cover shadow-md ring-2 ring-amber-500/40 flex-shrink-0"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg flex-shrink-0"
+              style={{ background: SUPERVISOR.color }}>
+              {SUPERVISOR.initials}
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <h3 className="font-bold text-slate-800 dark:text-slate-100">{SUPERVISOR.name}</h3>

@@ -9,8 +9,19 @@ export interface BlogPost {
   date: string
   author: string
   authorRole: string
+  authorAvatar?: string
   tags: string[]
   featured?: boolean
+}
+
+export const AUTHOR_AVATARS: Record<string, string> = {
+  'Dipesh Timsina': '/assets/aistudio/20251216_094640_6ed35b8b.jpg',
+  'Bimal Ghorsai': '/assets/aistudio/image_2439f431.png',
+}
+
+export const AUTHOR_POSITIONS: Record<string, string> = {
+  'Dipesh Timsina': 'center 46%',
+  'Bimal Ghorsai': 'center 25%',
 }
 
 export const blogPosts: BlogPost[] = [

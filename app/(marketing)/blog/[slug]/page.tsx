@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Clock, Calendar, User, Tag, ArrowRight, BookOpen, Share2 } from 'lucide-react'
-import { getBlogPost, blogPosts, categoryColorMap } from '../blogData'
+import { getBlogPost, blogPosts, categoryColorMap, AUTHOR_AVATARS, AUTHOR_POSITIONS } from '../blogData'
 import type { Metadata } from 'next'
 
 interface Props {
@@ -176,10 +176,19 @@ export default async function BlogPostPage({ params }: Props) {
             </p>
 
             {/* Author row */}
-            <div className="flex items-center gap-3 pb-8 mb-8 border-b border-slate-200 dark:border-slate-700">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                {initials}
-              </div>
+            <div className="flex items-center gap-3.5 pb-8 mb-8 border-b border-slate-200 dark:border-slate-700">
+              {AUTHOR_AVATARS[post.author] ? (
+                <img
+                  src={AUTHOR_AVATARS[post.author]}
+                  alt={post.author}
+                  style={{ objectPosition: AUTHOR_POSITIONS[post.author] || 'center 25%' }}
+                  className="w-11 h-11 rounded-full object-cover ring-2 ring-indigo-500/30 shadow-xs shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                  {initials}
+                </div>
+              )}
               <div>
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{post.author}</p>
                 <p className="text-xs text-slate-400">{post.authorRole}</p>
@@ -213,9 +222,18 @@ export default async function BlogPostPage({ params }: Props) {
             <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Written by</p>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-base shrink-0">
-                  {initials}
-                </div>
+                {AUTHOR_AVATARS[post.author] ? (
+                  <img
+                    src={AUTHOR_AVATARS[post.author]}
+                    alt={post.author}
+                    style={{ objectPosition: AUTHOR_POSITIONS[post.author] || 'center 25%' }}
+                    className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/30 shadow-xs shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-base shrink-0">
+                    {initials}
+                  </div>
+                )}
                 <div>
                   <p className="font-bold text-slate-900 dark:text-slate-50">{post.author}</p>
                   <p className="text-xs text-slate-400">{post.authorRole}</p>

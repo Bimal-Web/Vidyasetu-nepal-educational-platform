@@ -9,7 +9,7 @@ export default function TermsPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
       <h1 className="text-section text-slate-800 dark:text-slate-100 mb-2">Terms of Service</h1>
-      <p className="text-caption text-slate-400 mb-8">Last updated: August 2025</p>
+      <p className="text-caption text-slate-400 mb-8">Last updated: August 2026</p>
 
       <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
         {[

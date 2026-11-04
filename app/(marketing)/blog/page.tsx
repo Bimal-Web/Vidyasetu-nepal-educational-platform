@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Clock, ArrowRight, BookOpen, Flame, TrendingUp, Users, Star } from 'lucide-react'
-import { blogPosts, categoryColorMap } from './blogData'
+import { blogPosts, categoryColorMap, AUTHOR_AVATARS, AUTHOR_POSITIONS } from './blogData'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -102,9 +102,18 @@ export default function BlogPage() {
 
                     <div className="mt-auto pt-5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-indigo-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                          {post.author.split(' ').map(n => n[0]).join('')}
-                        </div>
+                        {AUTHOR_AVATARS[post.author] ? (
+                          <img
+                            src={AUTHOR_AVATARS[post.author]}
+                            alt={post.author}
+                            style={{ objectPosition: AUTHOR_POSITIONS[post.author] || 'center 25%' }}
+                            className="w-9 h-9 rounded-full object-cover ring-2 ring-indigo-500/30 shadow-xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-indigo-700 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {post.author.split(' ').map(n => n[0]).join('')}
+                          </div>
+                        )}
                         <div>
                           <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-tight">{post.author}</p>
                           <p className="text-[11px] text-slate-400">{post.date}</p>
@@ -159,7 +168,20 @@ export default function BlogPage() {
                     </p>
 
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-700 mt-auto">
-                      <p className="text-[11px] text-slate-400 font-medium">{post.date}</p>
+                      <div className="flex items-center gap-2">
+                        {AUTHOR_AVATARS[post.author] ? (
+                          <img
+                            src={AUTHOR_AVATARS[post.author]}
+                            alt={post.author}
+                            style={{ objectPosition: AUTHOR_POSITIONS[post.author] || 'center 25%' }}
+                            className="w-6 h-6 rounded-full object-cover ring-1 ring-slate-300 dark:ring-slate-600 shrink-0"
+                          />
+                        ) : null}
+                        <div>
+                          <p className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold leading-none">{post.author}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{post.date}</p>
+                        </div>
+                      </div>
                       <span className="flex items-center gap-1 text-xs font-bold text-indigo-700 dark:text-indigo-400 group-hover:gap-1.5 transition-all">
                         Read more <ArrowRight size={12} />
                       </span>

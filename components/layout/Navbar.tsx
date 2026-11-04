@@ -9,7 +9,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { 
   Search, Moon, Sun, Menu, X, BookOpen, FileText, Brain, 
   Clock, Award, Upload, ChevronDown, ChevronRight, LogOut, LayoutDashboard, 
-  Settings, User, Trophy, CornerDownLeft, Loader2, Newspaper, Sparkles, GraduationCap, Atom
+  Settings, User, Trophy, CornerDownLeft, Loader2, Newspaper, Sparkles, GraduationCap, Atom, Info
 } from 'lucide-react'
 
 const mobileNavSections = [
@@ -40,6 +40,7 @@ const mobileNavSections = [
   {
     title: 'Community',
     links: [
+      { label: 'About VidyaSetu', href: '/about', icon: Info },
       { label: 'Blog', href: '/blog', icon: Newspaper },
       { label: 'Contribute', href: '/contribute', icon: Upload },
     ]
@@ -427,6 +428,18 @@ export function Navbar() {
                 }`}
               >
                 Contribute
+              </Link>
+
+              {/* About */}
+              <Link
+                href="/about"
+                className={`text-xs xl:text-sm font-medium px-2.5 py-1.5 rounded-lg transition-all whitespace-nowrap ${
+                  pathname === '/about'
+                    ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60 font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/70'
+                }`}
+              >
+                About
               </Link>
             </nav>
 

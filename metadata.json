@@ -1,0 +1,6 @@
+{
+  "name": "VidyaSetu",
+  "description": "Nepal's comprehensive free digital education platform with curated notes, past papers, MCQ practice, and timed quizzes for Secondary, Higher Secondary, Bachelor, and Loksewa exams.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

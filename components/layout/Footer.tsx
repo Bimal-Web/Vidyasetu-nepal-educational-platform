@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Send, Github, Twitter, Linkedin, Facebook, Upload, ArrowRight, ShieldCheck, Heart } from 'lucide-react'
 
 const communityLinks = [
+  { label: 'About VidyaSetu',      href: '/about' },
   { label: 'Leaderboard',          href: '/leaderboard' },
   { label: 'Blog & Exam Guides',   href: '/blog' },
   { label: 'Contribute Resources', href: '/contribute' },
@@ -20,13 +21,6 @@ const academicLinks = [
   { label: '+2 Science & Management', href: '/browse?program=secondary' },
   { label: 'Loksewa PSC Preparation', href: '/browse?program=loksewa' },
   { label: 'TU / KU Faculties',       href: '/browse?program=bachelor' },
-]
-
-const companyLinks = [
-  { label: 'About VidyaSetu', href: '/about' },
-  { label: 'Academic Programs', href: '/programs' },
-  { label: 'Privacy Policy',  href: '/privacy' },
-  { label: 'Terms of Service', href: '/terms' },
 ]
 
 export function Footer() {
@@ -198,6 +192,8 @@ export function Footer() {
           </p>
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-slate-400 font-medium">BCA Final Year Project · Tribhuvan University</span>
+            <span className="text-slate-700">•</span>
+            <Link href="/about" className="hover:text-slate-300 text-indigo-400 font-medium transition-colors">About VidyaSetu</Link>
             <span className="text-slate-700">•</span>
             <Link href="/privacy" className="hover:text-slate-400 transition-colors">Privacy</Link>
             <span className="text-slate-700">•</span>
