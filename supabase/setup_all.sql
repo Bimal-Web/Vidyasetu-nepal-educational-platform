@@ -1,0 +1,684 @@
+-- ============================================================
+-- VidyaSetu — ALL-IN-ONE SUPABASE DATABASE SETUP SCRIPT
+-- Copy this entire file and paste into Supabase SQL Editor:
+-- Dashboard → SQL Editor → New Query → Run (Ctrl+Enter)
+-- ============================================================
+
+-- 1. Enable UUID extension
+create extension if not exists "uuid-ossp";
+
+-- ── Programs ──────────────────────────────────────────────
+create table if not exists public.programs (
+  id           uuid primary key default uuid_generate_v4(),
+  name         text not null,
+  level_order  int  not null default 0
+);
+
+-- ── Faculties / Streams ────────────────────────────────────
+create table if not exists public.faculties_or_streams (
+  id          uuid primary key default uuid_generate_v4(),
+  program_id  uuid not null references public.programs(id) on delete cascade,
+  name        text not null
+);
+create index if not exists idx_faculties_program on public.faculties_or_streams(program_id);
+
+-- ── Subjects ──────────────────────────────────────────────
+create table if not exists public.subjects (
+  id               uuid primary key default uuid_generate_v4(),
+  faculty_id       uuid not null references public.faculties_or_streams(id) on delete cascade,
+  name             text not null,
+  grade_or_semester text not null default '',
+  description      text not null default '',
+  icon_key         text not null default 'global',
+  color_key        text not null default 'indigo'
+);
+create index if not exists idx_subjects_faculty on public.subjects(faculty_id);
+
+-- ── Users (mirrors Supabase Auth) ─────────────────────────
+create table if not exists public.users (
+  id            uuid primary key references auth.users(id) on delete cascade,
+  full_name     text not null default '',
+  email         text not null,
+  auth_provider text not null default 'email',
+  role          text not null default 'student' check (role in ('student','contributor','admin')),
+  avatar_url    text,
+  created_at    timestamptz not null default now()
+);
+
+-- ── Content ───────────────────────────────────────────────
+create table if not exists public.content (
+  id          uuid primary key default uuid_generate_v4(),
+  subject_id  uuid not null references public.subjects(id) on delete cascade,
+  uploaded_by uuid not null references public.users(id) on delete cascade,
+  title       text not null,
+  type        text not null check (type in ('note','past_paper','mcq_set')),
+  file_url    text,
+  drive_url   text,
+  file_size   bigint,
+  status      text not null default 'pending' check (status in ('pending','approved','rejected')),
+  views       int  not null default 0,
+  downloads   int  not null default 0,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_content_subject    on public.content(subject_id);
+create index if not exists idx_content_status     on public.content(status);
+create index if not exists idx_content_uploaded_by on public.content(uploaded_by);
+
+-- ── Quizzes ───────────────────────────────────────────────
+create table if not exists public.quizzes (
+  id                  uuid primary key default uuid_generate_v4(),
+  subject_id          uuid not null references public.subjects(id) on delete cascade,
+  title               text not null,
+  question_count      int  not null default 0,
+  time_limit_minutes  int  not null default 30,
+  created_by          uuid references public.users(id) on delete set null,
+  created_at          timestamptz not null default now()
+);
+alter table public.quizzes alter column created_by drop not null;
+create index if not exists idx_quizzes_subject on public.quizzes(subject_id);
+
+-- ── Questions ─────────────────────────────────────────────
+create table if not exists public.questions (
+  id             uuid primary key default uuid_generate_v4(),
+  quiz_id        uuid not null references public.quizzes(id) on delete cascade,
+  question_text  text not null,
+  option_a       text not null,
+  option_b       text not null,
+  option_c       text not null,
+  option_d       text not null,
+  correct_option text not null check (correct_option in ('a','b','c','d')),
+  explanation    text
+);
+create index if not exists idx_questions_quiz on public.questions(quiz_id);
+
+-- ── Results ───────────────────────────────────────────────
+create table if not exists public.results (
+  id                  uuid primary key default uuid_generate_v4(),
+  user_id             uuid not null references public.users(id) on delete cascade,
+  quiz_id             uuid not null references public.quizzes(id) on delete cascade,
+  score               int  not null,
+  correct_count       int  not null default 0,
+  incorrect_count     int  not null default 0,
+  skipped_count       int  not null default 0,
+  time_taken_seconds  int  not null default 0,
+  attempted_at        timestamptz not null default now()
+);
+create index if not exists idx_results_user on public.results(user_id);
+create index if not exists idx_results_quiz on public.results(quiz_id);
+
+-- ── Bookmarks ─────────────────────────────────────────────
+create table if not exists public.bookmarks (
+  id          uuid primary key default uuid_generate_v4(),
+  user_id     uuid not null references public.users(id) on delete cascade,
+  content_id  uuid references public.content(id) on delete cascade,
+  subject_id  uuid references public.subjects(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  check (content_id is not null or subject_id is not null)
+);
+create index if not exists idx_bookmarks_user on public.bookmarks(user_id);
+
+-- ── Downloads Log ─────────────────────────────────────────
+create table if not exists public.downloads_log (
+  id             uuid primary key default uuid_generate_v4(),
+  user_id        uuid not null references public.users(id) on delete cascade,
+  content_id     uuid not null references public.content(id) on delete cascade,
+  downloaded_at  timestamptz not null default now()
+);
+create index if not exists idx_downloads_user    on public.downloads_log(user_id);
+create index if not exists idx_downloads_content on public.downloads_log(content_id);
+
+-- ── Submissions ───────────────────────────────────────────
+create table if not exists public.submissions (
+  id              uuid primary key default uuid_generate_v4(),
+  contributor_id  uuid not null references public.users(id) on delete cascade,
+  content_id      uuid not null references public.content(id) on delete cascade,
+  status          text not null default 'under_review' check (status in ('under_review','approved','rejected')),
+  reviewed_by     uuid references public.users(id),
+  reviewed_at     timestamptz
+);
+create index if not exists idx_submissions_contributor on public.submissions(contributor_id);
+create index if not exists idx_submissions_status      on public.submissions(status);
+
+-- ── Discussion Posts & Replies ─────────────────────────────
+create table if not exists public.discussion_posts (
+  id          uuid primary key default uuid_generate_v4(),
+  subject_id  uuid not null references public.subjects(id) on delete cascade,
+  user_id     uuid not null references public.users(id) on delete cascade,
+  content     text not null,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_discussion_posts_subject on public.discussion_posts(subject_id);
+create index if not exists idx_discussion_posts_user    on public.discussion_posts(user_id);
+
+create table if not exists public.discussion_replies (
+  id        uuid primary key default uuid_generate_v4(),
+  post_id   uuid not null references public.discussion_posts(id) on delete cascade,
+  user_id   uuid not null references public.users(id) on delete cascade,
+  content   text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_discussion_replies_post on public.discussion_replies(post_id);
+
+-- ── Newsletter Subscribers ──────────────────────────────────
+create table if not exists public.newsletter_subscribers (
+  id         uuid primary key default uuid_generate_v4(),
+  email      text not null unique,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- Row Level Security Policies
+-- ============================================================
+
+alter table public.programs              enable row level security;
+alter table public.faculties_or_streams  enable row level security;
+alter table public.subjects              enable row level security;
+alter table public.users                 enable row level security;
+alter table public.content               enable row level security;
+alter table public.quizzes               enable row level security;
+alter table public.questions             enable row level security;
+alter table public.results               enable row level security;
+alter table public.bookmarks             enable row level security;
+alter table public.downloads_log         enable row level security;
+alter table public.submissions           enable row level security;
+alter table public.discussion_posts         enable row level security;
+alter table public.discussion_replies       enable row level security;
+alter table public.newsletter_subscribers   enable row level security;
+
+create policy "public_read_programs"    on public.programs            for select using (true);
+create policy "public_read_faculties"   on public.faculties_or_streams for select using (true);
+create policy "public_read_subjects"    on public.subjects             for select using (true);
+
+create policy "users_own_read"   on public.users for select using (auth.uid() = id);
+create policy "users_own_update" on public.users for update using (auth.uid() = id);
+create policy "users_insert"     on public.users for insert with check (auth.uid() = id);
+create policy "users_own_delete" on public.users for delete using (auth.uid() = id);
+create policy "admin_read_users" on public.users for select using (
+  exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+);
+
+create policy "content_public_read"  on public.content for select using (status = 'approved');
+create policy "content_own_read"     on public.content for select using (uploaded_by = auth.uid());
+create policy "content_insert"       on public.content for insert with check (uploaded_by = auth.uid());
+create policy "content_own_delete"   on public.content for delete using (uploaded_by = auth.uid());
+create policy "admin_content_all"    on public.content for all using (
+  exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+);
+
+create policy "quizzes_public_read"   on public.quizzes   for select using (true);
+create policy "questions_public_read" on public.questions  for select using (true);
+
+create policy "results_own_all" on public.results for all using (user_id = auth.uid());
+create policy "bookmarks_own_all" on public.bookmarks for all using (user_id = auth.uid());
+
+create policy "downloads_own_insert" on public.downloads_log for insert with check (user_id = auth.uid());
+create policy "downloads_own_read"   on public.downloads_log for select using (user_id = auth.uid());
+create policy "downloads_own_delete" on public.downloads_log for delete using (user_id = auth.uid());
+
+create policy "submissions_own_all" on public.submissions for all using (contributor_id = auth.uid());
+create policy "admin_submissions_all" on public.submissions for all using (
+  exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
+);
+
+create policy "discussion_posts_public_read"  on public.discussion_posts for select using (true);
+create policy "discussion_posts_insert"       on public.discussion_posts for insert with check (auth.uid() = user_id);
+create policy "discussion_posts_own_update"   on public.discussion_posts for update using (auth.uid() = user_id);
+create policy "discussion_posts_own_delete"   on public.discussion_posts for delete using (auth.uid() = user_id);
+
+create policy "discussion_replies_public_read" on public.discussion_replies for select using (true);
+create policy "discussion_replies_insert"      on public.discussion_replies for insert with check (auth.uid() = user_id);
+create policy "discussion_replies_own_update"  on public.discussion_replies for update using (auth.uid() = user_id);
+create policy "discussion_replies_own_delete"  on public.discussion_replies for delete using (auth.uid() = user_id);
+
+create policy "newsletter_public_insert" on public.newsletter_subscribers for insert with check (true);
+
+-- ============================================================
+-- SEED DATA
+-- ============================================================
+
+-- Programs
+insert into public.programs (id, name, level_order) values
+  ('11111111-0000-0000-0000-000000000001', 'Pre-School & Primary', 1),
+  ('11111111-0000-0000-0000-000000000002', 'Secondary School (SEE)', 2),
+  ('11111111-0000-0000-0000-000000000003', 'Plus 2 (+2)', 3),
+  ('11111111-0000-0000-0000-000000000004', 'Bachelor''s', 4),
+  ('11111111-0000-0000-0000-000000000005', 'Entrance Prep', 5),
+  ('11111111-0000-0000-0000-000000000006', 'Loksewa & PSC', 6),
+  ('11111111-0000-0000-0000-000000000007', 'Government Competitive', 7)
+on conflict (id) do nothing;
+
+-- Faculties / Streams
+insert into public.faculties_or_streams (id, program_id, name) values
+  ('22222222-0000-0000-0000-000000000001', '11111111-0000-0000-0000-000000000003', 'Science'),
+  ('22222222-0000-0000-0000-000000000002', '11111111-0000-0000-0000-000000000003', 'Management'),
+  ('22222222-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000003', 'Humanities'),
+  ('22222222-0000-0000-0000-000000000004', '11111111-0000-0000-0000-000000000004', 'Engineering / CSIT'),
+  ('22222222-0000-0000-0000-000000000005', '11111111-0000-0000-0000-000000000004', 'Medical (MBBS/BDS)'),
+  ('22222222-0000-0000-0000-000000000006', '11111111-0000-0000-0000-000000000004', 'Management (BBS/BBA)'),
+  ('22222222-0000-0000-0000-000000000007', '11111111-0000-0000-0000-000000000004', 'Education (B.Ed)'),
+  ('22222222-0000-0000-0000-000000000008', '11111111-0000-0000-0000-000000000006', 'Kharidar / Na.Su.'),
+  ('22222222-0000-0000-0000-000000000009', '11111111-0000-0000-0000-000000000006', 'Officer Level'),
+  ('22222222-0000-0000-0000-000000000010', '11111111-0000-0000-0000-000000000005', 'IOE Entrance'),
+  ('22222222-0000-0000-0000-000000000011', '11111111-0000-0000-0000-000000000005', 'IOM / Medical Entrance'),
+  ('22222222-0000-0000-0000-000000000012', '11111111-0000-0000-0000-000000000002', 'Class 9-10 (SEE)'),
+  ('22222222-0000-0000-0000-000000000013', '11111111-0000-0000-0000-000000000001', 'Class 8 (BLE)'),
+  ('22222222-0000-0000-0000-000000000014', '11111111-0000-0000-0000-000000000007', 'Banking Preparation'),
+  ('22222222-0000-0000-0000-000000000015', '11111111-0000-0000-0000-000000000007', 'Teacher Service (TSC)'),
+  ('22222222-0000-0000-0000-000000000016', '11111111-0000-0000-0000-000000000004', 'BCA (Computer Application)')
+on conflict (id) do nothing;
+
+-- Subjects
+insert into public.subjects (id, faculty_id, name, grade_or_semester, description, icon_key, color_key) values
+  ('33333333-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'Physics', 'Grade 11', 'Mechanics, Thermodynamics, Optics, and Electromagnetism basics.', 'physics', 'indigo'),
+  ('33333333-0000-0000-0000-000000000002', '22222222-0000-0000-0000-000000000001', 'Chemistry', 'Grade 11', 'Inorganic, Organic, and Physical Chemistry fundamentals.', 'chemistry', 'amber'),
+  ('33333333-0000-0000-0000-000000000003', '22222222-0000-0000-0000-000000000001', 'Biology', 'Grade 11', 'Comprehensive study of Zoology and Botany for science students.', 'biology', 'green'),
+  ('33333333-0000-0000-0000-000000000004', '22222222-0000-0000-0000-000000000001', 'Mathematics', 'Grade 11', 'Calculus, Algebra, Trigonometry, and Analytical Geometry.', 'math', 'orange'),
+  ('33333333-0000-0000-0000-000000000005', '22222222-0000-0000-0000-000000000001', 'Computer Science', 'Grade 11', 'Programming concepts, Networking, and Database Systems.', 'computer', 'blue'),
+  ('33333333-0000-0000-0000-000000000006', '22222222-0000-0000-0000-000000000001', 'English', 'Grade 11', 'Literature summaries, Grammar guides, and Writing samples.', 'english', 'red'),
+  ('33333333-0000-0000-0000-000000000007', '22222222-0000-0000-0000-000000000008', 'General Knowledge', 'Kharidar', 'Comprehensive GK covering Nepal Constitution, Geography, and Current Affairs.', 'loksewa', 'indigo'),
+  ('33333333-0000-0000-0000-000000000008', '22222222-0000-0000-0000-000000000008', 'Nepali Language', 'Kharidar', 'Grammar, comprehension, and writing skills for Loksewa exams.', 'english', 'amber'),
+  ('33333333-0000-0000-0000-000000000009', '22222222-0000-0000-0000-000000000004', 'Engineering Mathematics I', 'Semester 1', 'Calculus, differential equations, and linear algebra for engineers.', 'math', 'blue'),
+  ('33333333-0000-0000-0000-000000000010', '22222222-0000-0000-0000-000000000004', 'C Programming', 'Semester 1', 'Fundamentals of C programming including data structures.', 'computer', 'indigo'),
+  ('33333333-0000-0000-0000-000000000011', '22222222-0000-0000-0000-000000000005', 'Anatomy', 'Year 1', 'Human body structure, organs, and systems for MBBS students.', 'medical', 'red'),
+  ('33333333-0000-0000-0000-000000000012', '22222222-0000-0000-0000-000000000005', 'Physiology', 'Year 1', 'Functions of the human body systems and physiological processes.', 'biology', 'green'),
+  ('33333333-0000-0000-0000-000000000020', '22222222-0000-0000-0000-000000000001', 'Physics', 'Grade 12', 'Advanced Mechanics, Waves, Modern Physics and Electromagnetism.', 'physics', 'indigo'),
+  ('33333333-0000-0000-0000-000000000021', '22222222-0000-0000-0000-000000000001', 'Chemistry', 'Grade 12', 'Advanced Organic Chemistry, Electrochemistry and Industrial Chemistry.', 'chemistry', 'amber'),
+  ('33333333-0000-0000-0000-000000000022', '22222222-0000-0000-0000-000000000001', 'Biology', 'Grade 12', 'Advanced Genetics, Evolution, Ecology and Human Physiology.', 'biology', 'green'),
+  ('33333333-0000-0000-0000-000000000023', '22222222-0000-0000-0000-000000000001', 'Mathematics', 'Grade 12', 'Advanced Calculus, Vectors, Complex Numbers, and Statistics.', 'math', 'orange'),
+  ('33333333-0000-0000-0000-000000000024', '22222222-0000-0000-0000-000000000001', 'Computer Science', 'Grade 12', 'Data Structures, Web Technology, and Programming Paradigms.', 'computer', 'blue'),
+  ('33333333-0000-0000-0000-000000000025', '22222222-0000-0000-0000-000000000002', 'Business Studies', 'Grade 12', 'Management principles, business functions, and entrepreneurship.', 'loksewa', 'indigo'),
+  ('33333333-0000-0000-0000-000000000026', '22222222-0000-0000-0000-000000000002', 'Accountancy', 'Grade 12', 'Financial accounting, partnership accounts, and company accounts.', 'math', 'amber'),
+  ('33333333-0000-0000-0000-000000000027', '22222222-0000-0000-0000-000000000002', 'Economics', 'Grade 12', 'Macro and Micro Economics fundamentals for management students.', 'loksewa', 'green'),
+  ('33333333-0000-0000-0000-000000000030', '22222222-0000-0000-0000-000000000012', 'Science & Technology', 'Class 10', 'Complete SEE Science including Physics, Chemistry and Biology.', 'physics', 'indigo'),
+  ('33333333-0000-0000-0000-000000000031', '22222222-0000-0000-0000-000000000012', 'Mathematics', 'Class 10', 'SEE Mathematics covering Algebra, Geometry, Statistics and Trigonometry.', 'math', 'orange'),
+  ('33333333-0000-0000-0000-000000000032', '22222222-0000-0000-0000-000000000012', 'Nepali', 'Class 10', 'SEE Nepali grammar, comprehension and essay writing.', 'english', 'green'),
+  ('33333333-0000-0000-0000-000000000033', '22222222-0000-0000-0000-000000000012', 'Social Studies', 'Class 10', 'SEE Social Studies covering History, Geography and Civics of Nepal.', 'loksewa', 'amber'),
+  ('33333333-0000-0000-0000-000000000034', '22222222-0000-0000-0000-000000000012', 'English', 'Class 10', 'SEE English Grammar, Reading Comprehension and Writing skills.', 'english', 'blue'),
+  ('33333333-0000-0000-0000-000000000040', '22222222-0000-0000-0000-000000000010', 'IOE Physics', 'Entrance', 'Intensive IOE entrance physics practice with past questions.', 'physics', 'indigo'),
+  ('33333333-0000-0000-0000-000000000041', '22222222-0000-0000-0000-000000000010', 'IOE Mathematics', 'Entrance', 'Full-coverage IOE entrance mathematics including Sets & Calculus.', 'math', 'orange'),
+  ('33333333-0000-0000-0000-000000000042', '22222222-0000-0000-0000-000000000010', 'IOE Chemistry', 'Entrance', 'IOE entrance chemistry practice sets and past year solutions.', 'chemistry', 'amber'),
+  ('33333333-0000-0000-0000-000000000050', '22222222-0000-0000-0000-000000000009', 'Public Administration', 'Officer Level', 'Public Admin theory, governance and policy.', 'loksewa', 'purple'),
+  ('33333333-0000-0000-0000-000000000051', '22222222-0000-0000-0000-000000000009', 'Management & GK', 'Officer Level', 'Management concepts and GK for Nepal government officer exams.', 'loksewa', 'indigo'),
+  ('33333333-0000-0000-0000-000000000052', '22222222-0000-0000-0000-000000000013', 'Class 8 Health & Physical Education', 'Class 8 (BLE)', 'BLE model paper and study resources for Class 8 Health & Physical Education.', 'biology', 'rose'),
+  ('33333333-0000-0000-0000-000000000053', '22222222-0000-0000-0000-000000000013', 'Class 8 Moral Education', 'Class 8 (BLE)', 'BLE model paper and study resources for Class 8 Moral Education.', 'english', 'purple'),
+  ('33333333-0000-0000-0000-000000000054', '22222222-0000-0000-0000-000000000013', 'Class 8 Social Studies', 'Class 8 (BLE)', 'BLE model paper and study resources for Class 8 Social Studies.', 'loksewa', 'amber'),
+  ('33333333-0000-0000-0000-000000000055', '22222222-0000-0000-0000-000000000013', 'Class 8 Vocational & Technical Education', 'Class 8 (BLE)', 'BLE model paper and study resources for Class 8 Vocational & Technical Education.', 'computer', 'green'),
+  -- BCA (Bachelor of Computer Application)
+  ('33333333-0000-0000-0000-000000000080', '22222222-0000-0000-0000-000000000016', 'C Programming', 'Semester 1 (BCA)', 'Structured programming concepts, pointers, memory allocation, arrays, structures, and file IO in C.', 'computer', 'indigo'),
+  ('33333333-0000-0000-0000-000000000081', '22222222-0000-0000-0000-000000000016', 'Computer Fundamentals & Applications', 'Semester 1 (BCA)', 'Computer hardware architecture, operating system basics, number systems, and business application software.', 'computer', 'blue'),
+  ('33333333-0000-0000-0000-000000000082', '22222222-0000-0000-0000-000000000016', 'Discrete Mathematics', 'Semester 2 (BCA)', 'Sets, relations, recurrence relations, graph theory, trees, and logic gates for computer application students.', 'math', 'orange'),
+  ('33333333-0000-0000-0000-000000000083', '22222222-0000-0000-0000-000000000016', 'Data Structures & Algorithms', 'Semester 3 (BCA)', 'Stacks, queues, linked lists, trees, graphs, hashing, sorting algorithms, and time complexity analysis.', 'computer', 'purple'),
+  ('33333333-0000-0000-0000-000000000084', '22222222-0000-0000-0000-000000000016', 'Object Oriented Programming in Java', 'Semester 3 (BCA)', 'Java OOP, inheritance, interfaces, packages, exception handling, multithreading, and GUI with Swing.', 'computer', 'amber'),
+  ('33333333-0000-0000-0000-000000000085', '22222222-0000-0000-0000-000000000016', 'Database Management System', 'Semester 4 (BCA)', 'ER modeling, relational schemas, SQL, normalization (1NF-BCNF), concurrency control, and transactions.', 'computer', 'green'),
+  ('33333333-0000-0000-0000-000000000086', '22222222-0000-0000-0000-000000000016', 'Web Technology', 'Semester 4 (BCA)', 'HTML5, CSS3, modern JavaScript ES6+, PHP, MySQL backend, and building responsive dynamic web apps.', 'computer', 'rose')
+on conflict (id) do nothing;
+
+-- Quizzes
+insert into public.quizzes (id, subject_id, title, question_count, time_limit_minutes) values
+  ('44444444-0000-0000-0000-000000000001', '33333333-0000-0000-0000-000000000020', 'Physics Grade 12 — Full Practice Set', 15, 20),
+  ('44444444-0000-0000-0000-000000000002', '33333333-0000-0000-0000-000000000021', 'Chemistry Grade 12 — Organic & Inorganic', 12, 18),
+  ('44444444-0000-0000-0000-000000000003', '33333333-0000-0000-0000-000000000023', 'Mathematics Grade 12 — Calculus & Vectors', 12, 20),
+  ('44444444-0000-0000-0000-000000000004', '33333333-0000-0000-0000-000000000050', 'Loksewa — Public Administration Officer Level', 15, 25),
+  ('44444444-0000-0000-0000-000000000005', '33333333-0000-0000-0000-000000000030', 'SEE Science — Complete Practice Set', 15, 20),
+  ('44444444-0000-0000-0000-000000000101', '33333333-0000-0000-0000-000000000001', 'Physics Chapter 1 Quiz — Kinematics', 10, 20),
+  ('44444444-0000-0000-0000-000000000102', '33333333-0000-0000-0000-000000000001', 'NEB Physics Grade 11 — Heat & Thermodynamics', 10, 20),
+  ('44444444-0000-0000-0000-000000000103', '33333333-0000-0000-0000-000000000002', 'Chemistry Grade 11 — Physical & Organic Practice', 10, 20),
+  ('44444444-0000-0000-0000-000000000104', '33333333-0000-0000-0000-000000000003', 'Biology Grade 11 — Cell Biology & Taxonomy', 10, 20),
+  ('44444444-0000-0000-0000-000000000105', '33333333-0000-0000-0000-000000000011', 'Anatomy Head, Neck & Gross Anatomy', 10, 20),
+  ('44444444-0000-0000-0000-000000000106', '33333333-0000-0000-0000-000000000007', 'Loksewa GK Practice Set — 2080 Style', 20, 40),
+  ('44444444-0000-0000-0000-000000000200', '33333333-0000-0000-0000-000000000022', 'Biology Grade 12 — Genetics & Evolution', 10, 20),
+  ('44444444-0000-0000-0000-000000000201', '33333333-0000-0000-0000-000000000005', 'Computer Science Gr 11 — C Programming Basics', 10, 20),
+  ('44444444-0000-0000-0000-000000000202', '33333333-0000-0000-0000-000000000024', 'Computer Science Gr 12 — Data Structures & OOP', 10, 20),
+  ('44444444-0000-0000-0000-000000000203', '33333333-0000-0000-0000-000000000004', 'Mathematics Grade 11 — Algebra & Trigonometry', 10, 20),
+  ('44444444-0000-0000-0000-000000000204', '33333333-0000-0000-0000-000000000026', 'Accountancy Gr 12 — Financial Accounting MCQs', 10, 20),
+  ('44444444-0000-0000-0000-000000000205', '33333333-0000-0000-0000-000000000027', 'Economics Grade 12 — Macro & Micro Quiz', 10, 20),
+  ('44444444-0000-0000-0000-000000000206', '33333333-0000-0000-0000-000000000025', 'Business Studies — Management Principles MCQ', 10, 20),
+  ('44444444-0000-0000-0000-000000000207', '33333333-0000-0000-0000-000000000031', 'SEE Mathematics — Algebra & Geometry MCQs', 10, 20),
+  ('44444444-0000-0000-0000-000000000208', '33333333-0000-0000-0000-000000000034', 'SEE English — Grammar & Comprehension Quiz', 10, 15),
+  ('44444444-0000-0000-0000-000000000209', '33333333-0000-0000-0000-000000000033', 'SEE Social Studies — Nepal History & Civics', 10, 15),
+  ('44444444-0000-0000-0000-000000000210', '33333333-0000-0000-0000-000000000040', 'IOE Entrance Physics — Full Mock Test', 10, 20),
+  ('44444444-0000-0000-0000-000000000211', '33333333-0000-0000-0000-000000000041', 'IOE Entrance Mathematics — Practice Set', 10, 20),
+  ('44444444-0000-0000-0000-000000000212', '33333333-0000-0000-0000-000000000012', 'Physiology MBBS — Cardiovascular & Renal', 10, 20),
+  ('44444444-0000-0000-0000-000000000213', '33333333-0000-0000-0000-000000000008', 'Loksewa Nepali — व्याकरण र भाषा दक्षता', 10, 15),
+  ('44444444-0000-0000-0000-000000000214', '33333333-0000-0000-0000-000000000051', 'Loksewa Management & GK — Officer Level', 10, 20),
+  ('44444444-0000-0000-0000-000000000216', '33333333-0000-0000-0000-000000000006', 'English Grade 11 — Grammar & Literature Review', 10, 15),
+  ('44444444-0000-0000-0000-000000000217', '33333333-0000-0000-0000-000000000032', 'SEE Nepali — व्याकरण र अभ्यास सेट', 10, 15),
+  ('44444444-0000-0000-0000-000000000218', '33333333-0000-0000-0000-000000000009', 'Engineering Math I — Calculus & Linear Algebra', 10, 20),
+  ('44444444-0000-0000-0000-000000000219', '33333333-0000-0000-0000-000000000010', 'C Programming — Functions, Pointers & Structures', 10, 20),
+  ('44444444-0000-0000-0000-000000000220', '33333333-0000-0000-0000-000000000042', 'IOE Entrance Chemistry — Practice Set', 10, 20),
+  -- BCA Quizzes
+  ('44444444-0000-0000-0000-000000000080', '33333333-0000-0000-0000-000000000080', 'BCA C Programming — Pointers, Arrays & Memory Management', 6, 15),
+  ('44444444-0000-0000-0000-000000000081', '33333333-0000-0000-0000-000000000081', 'BCA Computer Fundamentals & Architecture Mock Quiz', 6, 15),
+  ('44444444-0000-0000-0000-000000000082', '33333333-0000-0000-0000-000000000082', 'BCA Discrete Mathematics — Propositional Logic & Graph Theory', 6, 15),
+  ('44444444-0000-0000-0000-000000000083', '33333333-0000-0000-0000-000000000083', 'BCA Data Structures & Algorithms — Core Concepts & Big-O', 6, 15),
+  ('44444444-0000-0000-0000-000000000084', '33333333-0000-0000-0000-000000000084', 'BCA Java OOP — Inheritance, Exceptions & Multithreading', 6, 15),
+  ('44444444-0000-0000-0000-000000000085', '33333333-0000-0000-0000-000000000085', 'BCA DBMS — Relational Schemas, Normal Forms & SQL', 6, 15),
+  ('44444444-0000-0000-0000-000000000086', '33333333-0000-0000-0000-000000000086', 'BCA Web Technology — HTML5, CSS3, JavaScript & PHP', 6, 15)
+on conflict (id) do nothing;
+
+-- ── Questions Seed ───────────────────────────────────────────
+DELETE FROM public.questions WHERE quiz_id::text LIKE '44444444-%';
+INSERT INTO public.questions (quiz_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation) VALUES
+  -- BCA C Programming
+  ('44444444-0000-0000-0000-000000000080', 'Which format specifier is used to print the memory address of a pointer variable in C?', '%u', '%x', '%p', '%d', 'c', 'In C, %p is the standard format specifier used with printf to print pointer addresses.'),
+  ('44444444-0000-0000-0000-000000000080', 'What is the primary difference between malloc() and calloc() in standard C?', 'malloc allocates contiguous memory while calloc does not', 'calloc initializes allocated memory to zero while malloc leaves it uninitialized', 'malloc is faster than calloc because it takes two arguments', 'calloc can only allocate memory on the stack', 'b', 'calloc(n, size) initializes all allocated bytes to zero, whereas malloc(size) leaves memory uninitialized with garbage values.'),
+  ('44444444-0000-0000-0000-000000000080', 'Which operator cannot be overloaded or redefined in C?', 'sizeof', '+', '->', '==', 'a', 'C does not support operator overloading, and sizeof is evaluated at compile time.'),
+  ('44444444-0000-0000-0000-000000000080', 'What will be the output of printf("%d", 10 >> 1); in C?', '20', '5', '10', '1', 'b', 'Right-shift operator >> 1 divides an integer by 2: 10 >> 1 = 5.'),
+  ('44444444-0000-0000-0000-000000000080', 'In C, what is the size of a union that contains int a (4 bytes), double b (8 bytes), and char c[10] (10 bytes)?', '22 bytes', 'At least 10 bytes (padded to 16 bytes for double alignment)', '4 bytes', '8 bytes', 'b', 'A union allocates memory equal to its largest member (10 bytes), aligned to the largest scalar member.'),
+  ('44444444-0000-0000-0000-000000000080', 'Which mode in fopen() opens an existing file for both reading and writing without truncating it?', '"w+"', '"a"', '"r+"', '"w"', 'c', '"r+" opens an existing text file for both reading and writing from the start without truncating it.'),
+  -- BCA Computer Fundamentals
+  ('44444444-0000-0000-0000-000000000081', 'Which register holds the memory address of the next machine instruction to be fetched?', 'Instruction Register (IR)', 'Memory Data Register (MDR)', 'Program Counter (PC)', 'Accumulator (AC)', 'c', 'The Program Counter (PC) stores the memory address of the next sequential instruction to execute.'),
+  ('44444444-0000-0000-0000-000000000081', 'What is the 2''s complement of the 8-bit binary number 00001010 (+10)?', '11110101', '11110110', '11111010', '00001011', 'b', '1''s complement of 00001010 is 11110101; adding 1 yields 11110110 (-10).'),
+  ('44444444-0000-0000-0000-000000000081', 'Why does DRAM (Dynamic RAM) require periodic electrical refreshing?', 'Because it uses flip-flops that consume continuous power', 'Because it uses tiny capacitors that gradually leak their electrical charge', 'To clear temporary data after each CPU clock cycle', 'To prevent thermal breakdown in magnetic memory', 'b', 'DRAM cells store bits as charge on microscopic capacitors that leak and must be refreshed thousands of times per second.'),
+  ('44444444-0000-0000-0000-000000000081', 'Which memory hierarchy level has the smallest access time (fastest)?', 'L1 Cache', 'L2 Cache', 'CPU Registers', 'Main RAM', 'c', 'CPU registers reside directly inside the processor ALU/datapath and provide sub-nanosecond access.'),
+  ('44444444-0000-0000-0000-000000000081', 'Which CPU scheduling algorithm is non-preemptive and selects the process with the shortest burst time?', 'Round Robin (RR)', 'Shortest Job First (SJF Non-preemptive)', 'Shortest Remaining Time First (SRTF)', 'Priority Preemptive', 'b', 'Non-preemptive SJF executes the process with the shortest CPU burst until completion.'),
+  ('44444444-0000-0000-0000-000000000081', 'Which of the following is considered a Universal Logic Gate?', 'AND Gate', 'OR Gate', 'NAND Gate', 'XOR Gate', 'c', 'NAND and NOR gates are universal gates because any combinational circuit can be created using them alone.'),
+  -- BCA Discrete Mathematics
+  ('44444444-0000-0000-0000-000000000082', 'According to the Handshaking Theorem in graph theory, the sum of degrees of all vertices is equal to:', 'Number of edges |E|', '2 × Number of edges (2|E|)', 'Number of vertices |V|', '2 × Number of vertices (2|V|)', 'b', 'The Handshaking Lemma states that ∑ deg(v) = 2|E|, since every undirected edge contributes 2 to the total degree sum.'),
+  ('44444444-0000-0000-0000-000000000082', 'A relation R on a set A is an equivalence relation if and only if it is:', 'Reflexive, Symmetric, and Transitive', 'Reflexive, Antisymmetric, and Transitive', 'Irreflexive, Symmetric, and Transitive', 'Reflexive and Symmetric only', 'a', 'By definition, an equivalence relation must satisfy reflexivity, symmetry, and transitivity.'),
+  ('44444444-0000-0000-0000-000000000082', 'If a tree has 15 vertices, how many edges does it contain?', '15', '14', '16', '30', 'b', 'Any tree with n vertices has exactly n - 1 edges: 15 - 1 = 14 edges.'),
+  ('44444444-0000-0000-0000-000000000082', 'What is the truth value of the compound proposition P → Q when P is False and Q is False?', 'False', 'True', 'Indeterminate', 'Contradictory', 'b', 'In material implication, False implies False is vacuously True.'),
+  ('44444444-0000-0000-0000-000000000082', 'How many subsets does a set with 5 distinct elements have?', '25', '10', '32', '64', 'c', 'The power set of a set with n elements contains 2ⁿ subsets. For n = 5, 2⁵ = 32 subsets.'),
+  ('44444444-0000-0000-0000-000000000082', 'A connected undirected graph contains an Euler circuit if and only if:', 'It has exactly two vertices of odd degree', 'Every vertex has an even degree', 'It contains no cycles', 'The number of vertices is prime', 'b', 'Euler''s theorem proves a connected graph has an Eulerian circuit iff every vertex has an even degree.'),
+  -- BCA Data Structures & Algorithms
+  ('44444444-0000-0000-0000-000000000083', 'Which data structure operates strictly on the Last-In, First-Out (LIFO) principle?', 'Queue', 'Stack', 'Binary Search Tree', 'Priority Queue', 'b', 'A Stack permits insertion and deletion only at one end (the top), enforcing LIFO order.'),
+  ('44444444-0000-0000-0000-000000000083', 'What is the worst-case time complexity of the QuickSort algorithm?', 'O(n log n)', 'O(n²)', 'O(log n)', 'O(n)', 'b', 'QuickSort degrades to O(n²) when the chosen pivot is consistently the smallest or largest element.'),
+  ('44444444-0000-0000-0000-000000000083', 'In a circular queue of capacity SIZE implemented using an array, the condition for being full is:', 'front == rear', '(rear + 1) % SIZE == front', '(front + 1) % SIZE == rear', 'rear == SIZE', 'b', 'In a circular queue, the full condition is (rear + 1) % SIZE == front.'),
+  ('44444444-0000-0000-0000-000000000083', 'Which tree traversal of a Binary Search Tree (BST) produces keys in ascending sorted order?', 'Pre-order Traversal', 'In-order Traversal', 'Post-order Traversal', 'Level-order Traversal', 'b', 'In-order traversal visits (Left, Root, Right), which naturally outputs keys in ascending sorted order for a BST.'),
+  ('44444444-0000-0000-0000-000000000083', 'The balance factor of any node in an AVL tree is defined as:', 'Height of Left Subtree - Height of Right Subtree', 'Number of Left Children - Number of Right Children', 'Depth of Root - Depth of Node', 'Total Nodes in Left Subtree / Total Nodes in Right Subtree', 'a', 'Balance factor = Height(Left) - Height(Right), and must be -1, 0, or +1 for all nodes in an AVL tree.'),
+  ('44444444-0000-0000-0000-000000000083', 'Which algorithm finds a Minimum Spanning Tree (MST) using a greedy edge-by-edge approach with cycle detection?', 'Dijkstra''s Algorithm', 'Kruskal''s Algorithm', 'Bellman-Ford Algorithm', 'Floyd-Warshall Algorithm', 'b', 'Kruskal''s algorithm sorts edges by weight and greedily connects vertices while preventing cycles using Disjoint Sets.'),
+  -- BCA Java OOP
+  ('44444444-0000-0000-0000-000000000084', 'In Java, what is the key difference between final, finally, and finalize()?', 'final is a block, finally is a method, finalize is an access modifier', 'final is a modifier, finally is a cleanup block in exception handling, finalize() is a method called before GC', 'final creates constant objects only, finally throws exceptions, finalize is an interface', 'They are identical in modern Java', 'b', 'final defines immutable variables/classes/methods; finally is a block that always executes after try-catch; finalize() is invoked prior to garbage collection.'),
+  ('44444444-0000-0000-0000-000000000084', 'Why does Java not support multiple inheritance of classes directly?', 'Due to CPU instruction limits', 'To avoid the Diamond Problem and ambiguous method resolutions', 'Because classes in Java cannot have constructors', 'Because Java bytecode only supports single pointers', 'b', 'Java avoids ambiguous method inheritance (the Diamond Problem) by enforcing single class inheritance while supporting multiple interfaces.'),
+  ('44444444-0000-0000-0000-000000000084', 'Which collection class in Java is synchronized and thread-safe by default?', 'ArrayList', 'Vector', 'LinkedList', 'HashSet', 'b', 'Vector is synchronized and thread-safe, whereas ArrayList is unsynchronized for higher single-threaded throughput.'),
+  ('44444444-0000-0000-0000-000000000084', 'What happens when an unhandled NullPointerException occurs during Java runtime?', 'The JVM automatically initializes the reference to a default object', 'The current thread terminates and outputs an exception stack trace', 'The compiler re-runs with debug flags', 'The program restarts from main()', 'b', 'NullPointerException is an unchecked RuntimeException that aborts the thread if left uncaught.'),
+  ('44444444-0000-0000-0000-000000000084', 'Which access modifier allows members to be accessible within the package and by subclasses in other packages?', 'private', 'default (package-private)', 'protected', 'public', 'c', 'protected permits access within the defining package and to subclasses in different packages.'),
+  ('44444444-0000-0000-0000-000000000084', 'In Java, String objects are immutable. What does this mean?', 'A String reference variable cannot be reassigned', 'Once created, the character sequence inside a String object cannot be altered', 'Strings can only be stored in CPU cache', 'Strings cannot be passed as method arguments', 'b', 'String immutability means the character content cannot change in-place; modifications create new String objects.'),
+  -- BCA DBMS
+  ('44444444-0000-0000-0000-000000000085', 'Which ACID property guarantees that either all operations of a transaction succeed or none are applied?', 'Consistency', 'Isolation', 'Atomicity', 'Durability', 'c', 'Atomicity guarantees all-or-nothing execution for database transactions.'),
+  ('44444444-0000-0000-0000-000000000085', 'A database relation is in Second Normal Form (2NF) if it is in 1NF and:', 'Has no transitive functional dependencies', 'Has no partial functional dependencies on candidate keys', 'Every determinant is a super key', 'Contains only numeric columns', 'b', '2NF requires all non-prime attributes to be fully functionally dependent on the primary key, eliminating partial dependencies.'),
+  ('44444444-0000-0000-0000-000000000085', 'What is the primary difference between WHERE and HAVING clauses in SQL?', 'WHERE filters rows before grouping; HAVING filters groups after GROUP BY', 'WHERE is only used with SELECT; HAVING is used with UPDATE', 'WHERE can use aggregate functions like COUNT(); HAVING cannot', 'They are completely interchangeable in ANSI SQL', 'a', 'WHERE filters individual candidate rows prior to aggregation, while HAVING filters grouped results after GROUP BY.'),
+  ('44444444-0000-0000-0000-000000000085', 'In relational algebra, which operator returns tuples that are present in relation R but not in relation S?', 'Union (R ∪ S)', 'Cartesian Product (R × S)', 'Set Difference (R - S)', 'Intersection (R ∩ S)', 'c', 'Set Difference (R - S) selects tuples present in R that do not exist in relation S.'),
+  ('44444444-0000-0000-0000-000000000085', 'What is the role of a Foreign Key constraint in relational schemas?', 'To automatically encrypt sensitive columns', 'To enforce referential integrity between child and parent tables', 'To generate auto-incrementing integer IDs', 'To enable full-text indexing on char columns', 'b', 'A Foreign Key enforces referential integrity by ensuring values in the child table reference valid primary keys in the parent table.'),
+  ('44444444-0000-0000-0000-000000000085', 'Which concurrency protocol guarantees conflict serializability without allowing cascading rollbacks?', 'Strict Two-Phase Locking (Strict 2PL)', 'Simple Read Locking', 'Timestamp Ordering without validation', 'Dirty Read Isolation', 'a', 'Strict 2PL holds all exclusive write locks until transaction completion, ensuring serializability and avoiding cascading rollbacks.'),
+  -- BCA Web Tech
+  ('44444444-0000-0000-0000-000000000086', 'What is the difference between == and === in JavaScript?', '== checks both value and data type; === converts types automatically', '== performs type coercion before comparison; === checks strict equality without type conversion', '== is for numbers only; === is for strings', '== assigns values; === compares values', 'b', '=== checks strict equality with no type coercion; == coerces values to common types before comparing.'),
+  ('44444444-0000-0000-0000-000000000086', 'Which CSS Flexbox property distributes items along the main axis?', 'align-items', 'justify-content', 'align-content', 'flex-direction', 'b', 'justify-content controls alignment and spacing of flex items along the main axis.'),
+  ('44444444-0000-0000-0000-000000000086', 'How does localStorage differ from sessionStorage in web browsers?', 'localStorage expires after 24 hours; sessionStorage never expires', 'localStorage persists across browser tabs and sessions; sessionStorage clears when the tab is closed', 'localStorage only stores binary files; sessionStorage stores text', 'sessionStorage is encrypted while localStorage is plain text', 'b', 'localStorage persists permanently until explicitly removed; sessionStorage is isolated to the tab session.'),
+  ('44444444-0000-0000-0000-000000000086', 'In the DOM event flow, what is the phase called when an event propagates upwards to the root document?', 'Capturing Phase', 'Target Phase', 'Bubbling Phase', 'Dispatching Phase', 'c', 'Event Bubbling propagates an event from the deepest target element upwards through parent ancestor nodes.'),
+  ('44444444-0000-0000-0000-000000000086', 'In PHP, which superglobal array is populated when an HTML form is submitted with method="POST"?', '$_GET', '$_POST', '$_REQUEST_DATA', '$_FORM', 'b', '$_POST is the superglobal associative array containing data sent via HTTP POST requests.'),
+  ('44444444-0000-0000-0000-000000000086', 'Which HTTP response status code indicates that the requested resource could not be found?', '200 OK', '301 Moved Permanently', '404 Not Found', '500 Internal Server Error', 'c', 'HTTP 404 Not Found signifies that the origin server did not find a current representation for the target URL.'),
+  ('44444444-0000-0000-0000-000000000101', 'A car starts from rest and accelerates uniformly at 4 m/s². What is its velocity after 5 seconds?', '10 m/s', '20 m/s', '15 m/s', '25 m/s', 'b', 'Using v = u + at = 0 + 4×5 = 20 m/s'),
+  ('44444444-0000-0000-0000-000000000101', 'Which of the following is a scalar quantity?', 'Velocity', 'Acceleration', 'Speed', 'Force', 'c', 'Speed only has magnitude, making it a scalar.'),
+  ('44444444-0000-0000-0000-000000000101', 'A body moving with uniform velocity has zero:', 'Speed', 'Displacement', 'Acceleration', 'Momentum', 'c', 'Uniform velocity means constant velocity, so acceleration = 0.'),
+  ('44444444-0000-0000-0000-000000000101', 'The slope of a displacement-time graph gives:', 'Acceleration', 'Velocity', 'Distance', 'Speed', 'b', 'Slope = Δdisplacement/Δtime = velocity.'),
+  ('44444444-0000-0000-0000-000000000101', 'A projectile is thrown horizontally from a cliff of height 80 m. Time to reach the ground is: (g = 10 m/s²)', '4 s', '8 s', '2 s', '6 s', 'a', 'h = ½gt² → 80 = ½×10×t² → t² = 16 → t = 4 s'),
+  ('44444444-0000-0000-0000-000000000101', 'Which equation of motion relates velocity, acceleration and displacement?', 'v = u + at', 's = ut + ½at²', 'v² = u² + 2as', 'a = (v-u)/t', 'c', 'v² = u² + 2as relates v, u, a and s without time.'),
+  ('44444444-0000-0000-0000-000000000101', 'An object is thrown vertically upward with velocity 20 m/s. Maximum height reached is: (g = 10 m/s²)', '10 m', '20 m', '30 m', '40 m', 'b', 'v² = u² - 2gh → 0 = 400 - 20h → h = 20 m'),
+  ('44444444-0000-0000-0000-000000000101', 'Relative velocity of two objects moving in the same direction with velocities v₁ and v₂ (v₁ > v₂) is:', 'v₁ + v₂', 'v₁ - v₂', 'v₁ × v₂', 'v₁ / v₂', 'b', 'For same direction motion, relative velocity = v₁ - v₂.'),
+  ('44444444-0000-0000-0000-000000000101', 'The area under a velocity-time graph represents:', 'Velocity', 'Acceleration', 'Displacement', 'Force', 'c', 'Area under v-t graph = displacement covered.'),
+  ('44444444-0000-0000-0000-000000000101', 'A body is dropped from rest. Distance fallen in 3rd second is: (g = 10 m/s²)', '25 m', '30 m', '20 m', '45 m', 'a', 'sₙ = u + g(2n-1)/2 = 0 + 10(5)/2 = 25 m'),
+-- Physics Gr 11 - Heat & Thermodynamics
+  ('44444444-0000-0000-0000-000000000102', 'SI unit of specific heat capacity is:', 'J/kg', 'J kg⁻¹ K⁻¹', 'J K⁻¹', 'cal/g', 'b', 'Specific heat capacity s = Q/(m·ΔT), measured in J kg⁻¹ K⁻¹.'),
+  ('44444444-0000-0000-0000-000000000102', 'First law of thermodynamics is based on conservation of:', 'Mass', 'Momentum', 'Energy', 'Charge', 'c', 'First law states dQ = dU + dW, expressing conservation of energy.'),
+  ('44444444-0000-0000-0000-000000000102', 'In an adiabatic process, which quantity remains constant?', 'Pressure', 'Volume', 'Heat energy', 'Temperature', 'c', 'An adiabatic process is one in which no heat enters or leaves the system (dQ = 0).'),
+  ('44444444-0000-0000-0000-000000000102', 'The efficiency of a Carnot engine working between temperatures T₁ and T₂ (T₁ > T₂) is:', '1 - T₂/T₁', '1 - T₁/T₂', 'T₂/T₁', 'T₁/T₂ - 1', 'a', 'Carnot efficiency η = 1 - T₂/T₁, where temperatures are in Kelvin.'),
+  ('44444444-0000-0000-0000-000000000102', 'The relation between superficial expansion (β) and linear expansion (α) is:', 'β = α', 'β = 2α', 'β = 3α', 'β = α/2', 'b', 'Areal/superficial expansion β is twice linear expansion α (β = 2α).'),
+  ('44444444-0000-0000-0000-000000000102', 'Triple point of water in Kelvin scale is:', '273.15 K', '273.16 K', '373.15 K', '0 K', 'b', 'The triple point of water is exactly defined as 273.16 K (0.01 °C).'),
+  ('44444444-0000-0000-0000-000000000102', 'Work done in an isothermal expansion of n moles of gas from V₁ to V₂ is:', 'nRT (V₂ - V₁)', 'nRT ln(V₂/V₁)', 'nR (T₂ - T₁)', 'P (V₂ - V₁)', 'b', 'For isothermal process ΔT=0, W = ∫P dV = nRT ln(V₂/V₁).'),
+  ('44444444-0000-0000-0000-000000000102', 'Stefan-Boltzmann law states that total radiant energy emitted per second per unit area is proportional to:', 'T', 'T²', 'T³', 'T⁴', 'd', 'E = σ T⁴, energy emitted is proportional to the fourth power of absolute temperature.'),
+  ('44444444-0000-0000-0000-000000000102', 'Molar heat capacity at constant pressure (Cp) and constant volume (Cv) are related by Mayer''s formula:', 'Cp - Cv = R', 'Cv - Cp = R', 'Cp / Cv = R', 'Cp + Cv = R', 'a', 'Mayer''s relation states Cp - Cv = R for an ideal gas.'),
+  ('44444444-0000-0000-0000-000000000102', 'Heat transfer by actual movement of fluid particles is called:', 'Conduction', 'Convection', 'Radiation', 'Advection', 'b', 'Convection is heat transfer via physical fluid mass movement.'),
+-- Chemistry Gr 11
+  ('44444444-0000-0000-0000-000000000103', 'How many moles of gas are present in 44 grams of CO₂? (Molar mass of CO₂ = 44 g/mol)', '0.5 mol', '1.0 mol', '2.0 mol', '4.0 mol', 'b', 'Number of moles = mass / molar mass = 44 / 44 = 1.0 mol.'),
+  ('44444444-0000-0000-0000-000000000103', 'Which quantum number determines the three-dimensional shape of an orbital?', 'Principal quantum number (n)', 'Azimuthal quantum number (l)', 'Magnetic quantum number (m)', 'Spin quantum number (s)', 'b', 'Azimuthal (subsidiary) quantum number l determines orbital shape (s=sphere, p=dumbbell).'),
+  ('44444444-0000-0000-0000-000000000103', 'What is the hybridization of the central carbon atom in Methane (CH₄)?', 'sp', 'sp²', 'sp³', 'sp³d', 'c', 'Carbon forms 4 single sigma bonds in CH₄, corresponding to sp³ hybridization.'),
+  ('44444444-0000-0000-0000-000000000103', 'The IUPAC name of CH₃-CH=CH₂ is:', 'Propane', 'Propene', 'Propyne', 'Cyclopropane', 'b', 'Three carbon chain with a double bond is named propene.'),
+  ('44444444-0000-0000-0000-000000000103', 'What is the oxidation state of Manganese in KMnO₄?', '+2', '+4', '+6', '+7', 'd', 'K(+1) + Mn(x) + 4×O(-2) = 0 → 1 + x - 8 = 0 → x = +7.'),
+  ('44444444-0000-0000-0000-000000000103', 'Which functional group is present in aldehydes?', '-OH', '-COOH', '-CHO', '-CO-', 'c', 'Aldehydes contain the formyl group -CHO.'),
+  ('44444444-0000-0000-0000-000000000103', 'Boyle''s Law states that at constant temperature, pressure of a gas is inversely proportional to:', 'Temperature', 'Volume', 'Density', 'Mass', 'b', 'P ∝ 1/V at constant T (P₁V₁ = P₂V₂).'),
+  ('44444444-0000-0000-0000-000000000103', 'Empirical formula of Benzene (C₆H₆) is:', 'CH', 'C₂H₂', 'C₆H₆', 'CH₂', 'a', 'Simplest whole-number ratio of C:H in C₆H₆ is 1:1, hence CH.'),
+  ('44444444-0000-0000-0000-000000000103', 'Which element has the highest electronegativity on Pauling scale?', 'Oxygen', 'Chlorine', 'Fluorine', 'Nitrogen', 'c', 'Fluorine has the highest electronegativity value of 4.0.'),
+  ('44444444-0000-0000-0000-000000000103', 'Addition of HBr to propene follows Markownikoff''s rule to yield:', '1-bromopropane', '2-bromopropane', '1,2-dibromopropane', 'Propane', 'b', 'Negative part (Br⁻) attaches to carbon with fewer hydrogens, giving 2-bromopropane.'),
+-- Biology Gr 11
+  ('44444444-0000-0000-0000-000000000104', 'Which organelle is responsible for cellular protein synthesis?', 'Lysosome', 'Ribosome', 'Golgi apparatus', 'Vacuole', 'b', 'Ribosomes translate mRNA into protein polypeptide chains.'),
+  ('44444444-0000-0000-0000-000000000104', 'In mitosis, chromosomes align at the equatorial plate during:', 'Prophase', 'Metaphase', 'Anaphase', 'Telophase', 'b', 'Chromosomes align along the metaphase plate during metaphase.'),
+  ('44444444-0000-0000-0000-000000000104', 'The fluid mosaic model of cell membrane was proposed by:', 'Robert Hooke', 'Singer and Nicolson', 'Schleiden and Schwann', 'Watson and Crick', 'b', 'Singer and Nicolson proposed the Fluid Mosaic Model in 1972.'),
+  ('44444444-0000-0000-0000-000000000104', 'Which vascular tissue is responsible for transporting water and minerals in plants?', 'Phloem', 'Xylem', 'Cambium', 'Cortex', 'a', 'Xylem conducts water and dissolved minerals upward from roots.'),
+  ('44444444-0000-0000-0000-000000000104', 'The basic unit of biological classification is:', 'Genus', 'Family', 'Order', 'Species', 'd', 'Species is the principal basic unit of biological classification.'),
+  ('44444444-0000-0000-0000-000000000104', 'Cell wall of fungi is composed mainly of:', 'Cellulose', 'Chitin', 'Pectin', 'Lignin', 'b', 'Fungal cell walls consist of chitin, a polymer of N-acetylglucosamine.'),
+  ('44444444-0000-0000-0000-000000000104', 'Crossing over during meiosis occurs at which stage of Prophase I?', 'Leptotene', 'Zygotene', 'Pachytene', 'Diplotene', 'c', 'Genetic recombination/crossing over occurs in the Pachytene substage.'),
+  ('44444444-0000-0000-0000-000000000104', 'Which nitrogenous base is present in RNA but absent in DNA?', 'Adenine', 'Guanine', 'Thymine', 'Uracil', 'd', 'RNA contains Uracil (U) instead of Thymine (T) found in DNA.'),
+  ('44444444-0000-0000-0000-000000000104', 'Double fertilization is a characteristic feature of:', 'Gymnosperms', 'Angiosperms', 'Pteridophytes', 'Bryophytes', 'b', 'Double fertilization producing diploid zygote and triploid endosperm is unique to Angiosperms.'),
+  ('44444444-0000-0000-0000-000000000104', 'The powerhouse of the cell is:', 'Nucleus', 'Mitochondria', 'Chloroplast', 'Endoplasmic Reticulum', 'b', 'Mitochondria generate cellular ATP via aerobic respiration.'),
+-- Mathematics Gr 11
+  ('44444444-0000-0000-0000-000000000203', 'If a set A has n elements, the total number of subsets of A is:', 'n²', '2ⁿ', '2n', 'n!', 'b', 'Power set size = 2ⁿ.'),
+  ('44444444-0000-0000-0000-000000000203', 'Roots of the quadratic equation x² - 5x + 6 = 0 are:', '1 and 6', '2 and 3', '-2 and -3', '-1 and -6', 'b', '(x - 2)(x - 3) = 0 → x = 2, 3.'),
+  ('44444444-0000-0000-0000-000000000203', 'The value of sin(90° - θ) is equal to:', 'sin θ', 'cos θ', '-cos θ', 'tan θ', 'b', 'Complementary angle identity: sin(90° - θ) = cos θ.'),
+  ('44444444-0000-0000-0000-000000000203', 'The sum of the first n natural numbers is given by:', 'n(n+1)', 'n(n+1)/2', 'n²/2', '(n+1)/2', 'b', 'Sum = 1 + 2 + ... + n = n(n+1)/2.'),
+  ('44444444-0000-0000-0000-000000000203', 'Distance between origin (0,0) and point (3,4) is:', '5', '7', '12', '25', 'a', 'd = √(3² + 4²) = √25 = 5.'),
+  ('44444444-0000-0000-0000-000000000203', 'Derivative of xⁿ with respect to x is:', 'n xⁿ', 'n xⁿ⁻¹', 'xⁿ⁻¹', 'n xⁿ⁺¹', 'b', 'Power rule of differentiation: d/dx[xⁿ] = n xⁿ⁻¹.'),
+  ('44444444-0000-0000-0000-000000000203', 'Value of tan(45°) is:', '0', '1/2', '1', '√3', 'c', 'tan(45°) = sin(45°)/cos(45°) = 1.'),
+  ('44444444-0000-0000-0000-000000000203', 'The n-th term of an Arithmetic Progression with first term a and common difference d is:', 'a + nd', 'a + (n-1)d', 'a · dⁿ⁻¹', 'a + (n+1)d', 'b', 'Tₙ = a + (n-1)d.'),
+  ('44444444-0000-0000-0000-000000000203', 'If sets A and B are disjoint, then n(A ∪ B) equals:', 'n(A) + n(B)', 'n(A) - n(B)', 'n(A) × n(B)', '0', 'a', 'For disjoint sets, n(A ∩ B) = 0, so n(A ∪ B) = n(A) + n(B).'),
+  ('44444444-0000-0000-0000-000000000203', 'The value of i² in complex numbers (where i = √-1) is:', '1', '-1', '0', 'i', 'b', 'By definition of imaginary unit, i² = -1.'),
+-- Computer Science Gr 11
+  ('44444444-0000-0000-0000-000000000201', 'Which keyword in C is used to define a constant variable?', 'static', 'const', 'define', 'final', 'b', 'const keyword declares a read-only variable.'),
+  ('44444444-0000-0000-0000-000000000201', 'What is the size of int data type in a standard 32-bit C compiler?', '1 byte', '2 bytes', '4 bytes', '8 bytes', 'c', 'A standard 32-bit integer occupies 4 bytes (32 bits).'),
+  ('44444444-0000-0000-0000-000000000201', 'Which operator is used to access the memory address of a variable in C?', '*', '&', '->', '.', 'b', 'The & operator returns the memory address of a variable.'),
+  ('44444444-0000-0000-0000-000000000201', 'Which loop executes at least once even if the condition is false?', 'for loop', 'while loop', 'do-while loop', 'nested loop', 'c', 'do-while evaluates condition after executing the body once.'),
+  ('44444444-0000-0000-0000-000000000201', 'Binary representation of decimal number 10 is:', '1000', '1010', '1100', '1001', 'b', '10 in binary = 8 + 2 = 1010₂.'),
+  ('44444444-0000-0000-0000-000000000201', 'The primary processing unit / brain of a computer system is:', 'RAM', 'Hard Disk', 'CPU', 'ALU', 'c', 'The Central Processing Unit (CPU) executes instructions.'),
+  ('44444444-0000-0000-0000-000000000201', 'Which type of memory is primary and volatile?', 'ROM', 'RAM', 'Flash Drive', 'SSD', 'b', 'RAM loses its contents when power is turned off (volatile).'),
+  ('44444444-0000-0000-0000-000000000201', 'Which of the following is a valid C variable name?', '2name', 'user_name', 'int', 'user-name', 'b', 'Identifiers cannot start with digits, contain hyphens, or use C keywords.'),
+  ('44444444-0000-0000-0000-000000000201', 'Which function in stdio.h is used to print formatted output to stdout?', 'scanf()', 'printf()', 'puts()', 'write()', 'b', 'printf() formats and outputs text to standard output.'),
+  ('44444444-0000-0000-0000-000000000201', 'Which escape sequence represents a newline character in C?', '\t', '\n', '\\', '\r', 'b', '\n creates a new line in formatted output strings.'),
+-- English Gr 11
+  ('44444444-0000-0000-0000-000000000216', 'Choose the correct preposition: "She is very fond ___ listening to classical music."', 'of', 'in', 'with', 'about', 'a', 'The adjective "fond" takes the preposition "of".'),
+  ('44444444-0000-0000-0000-000000000216', 'Select the passive voice of: "They are building a new bridge across the river."', 'A new bridge was built by them.', 'A new bridge is built by them.', 'A new bridge is being built by them.', 'A new bridge has been built by them.', 'c', 'Present continuous passive: Subject + is/am/are + being + V3.'),
+  ('44444444-0000-0000-0000-000000000216', 'Choose the correct verb form: "Neither of the boys ___ present in class yesterday."', 'was', 'were', 'are', 'have been', 'a', '"Neither" takes a singular verb (was).'),
+  ('44444444-0000-0000-0000-000000000216', 'What is the synonym of the word "Benevolent"?', 'Cruel', 'Kindhearted', 'Greedy', 'Arrogant', 'b', 'Benevolent means well-meaning and kindly.'),
+  ('44444444-0000-0000-0000-000000000216', 'Complete the conditional sentence: "If I had known your address, I ___ you."', 'will visit', 'would visit', 'would have visited', 'had visited', 'c', 'Third conditional structure: If + past perfect, would have + past participle.'),
+  ('44444444-0000-0000-0000-000000000216', 'Convert to indirect speech: He said, "I am working on my project."', 'He said that he is working on his project.', 'He said that he was working on his project.', 'He said that I was working on my project.', 'He told he worked on his project.', 'b', 'Present continuous changes to past continuous in indirect speech.'),
+  ('44444444-0000-0000-0000-000000000216', 'What is the antonym of the word "Optimistic"?', 'Cheerful', 'Hopeful', 'Pessimistic', 'Confident', 'c', 'Pessimistic (expecting the worst) is the antonym of optimistic.'),
+  ('44444444-0000-0000-0000-000000000216', 'Identify the figure of speech: "The wind whispered through the tall pines."', 'Simile', 'Metaphor', 'Personification', 'Hyperbole', 'c', 'Giving human qualities (whispering) to non-human things (wind) is personification.'),
+  ('44444444-0000-0000-0000-000000000216', 'Choose the correct article: "He returned home after ___ hour."', 'a', 'an', 'the', 'no article', 'b', '"Hour" starts with a vowel sound (/aʊər/), requiring "an".'),
+  ('44444444-0000-0000-0000-000000000216', 'What is the plural form of the word "Criterion"?', 'Criterions', 'Criteria', 'Criterias', 'Criterion', 'b', 'Criterion is of Greek origin; its plural form is criteria.'),
+-- Nepali Kharidar
+  ('44444444-0000-0000-0000-000000000213', 'नेपाली व्याकरणमा "नाप, तौल वा परिमाण" बुझाउने शब्द कुन वर्गमा पर्छ?', 'जातिवाचक नाम', 'द्रव्यवाचक नाम', 'समूहवाचक नाम', 'भाववाचक नाम', 'b', 'द्रव्यवाचक नामले गन्न नसकिने, नाप्न वा तौलन सकिने पदार्थ बुझाउँछ।'),
+  ('44444444-0000-0000-0000-000000000213', 'नेपाली व्याकरण अनुसार "पढ्दै छ" वाक्यमा कुन काल र पक्ष रहेको छ?', 'सामान्य वर्तमान', 'अपूर्ण वर्तमान', 'पूर्ण वर्तमान', 'अपूर्ण भूत', 'b', 'धातु + दै/दै छ रूपले अपूर्ण वर्तमान पक्ष बुझाउँछ।'),
+  ('44444444-0000-0000-0000-000000000213', '"गृह" शब्दको सही पर्यायवाची शब्द कुन हो?', 'वन', 'घर', 'जल', 'आकाश', 'b', 'गृह र घर एकै अर्थ दिने पर्यायवाची शब्द हुन्।'),
+  ('44444444-0000-0000-0000-000000000213', '"उज्यालो" शब्दको सही विपरीतार्थी शब्द छान्नुहोस्:', 'प्रकाश', 'दीपक', 'अँध्यारो', 'तेज', 'c', 'उज्यालोको उल्टो अर्थ अँध्यारो हुन्छ।'),
+  ('44444444-0000-0000-0000-000000000213', '"राम विस्तारै हिँड्छ" वाक्यमा "विस्तारै" शब्द कुन पदवर्ग हो?', 'नाम', 'सर्वनाम', 'विशेषण', 'क्रियाविशेषण', 'd', 'क्रियाको विशेषता बुझाउने शब्द क्रियाविशेषण हो।'),
+  ('44444444-0000-0000-0000-000000000213', 'तलका मध्ये शुद्ध शब्द कुन हो?', 'अनुसासन', 'अनुशासन', 'अनुशाशन', 'अन्सासन', 'b', 'शुद्ध रूप "अनुशासन" हो।'),
+  ('44444444-0000-0000-0000-000000000213', '"उनीहरू आए" वाक्यको सही अकरण रूप कुन हो?', 'उनीहरू जाँदैनन्', 'उनीहरू आएनन्', 'उनीहरू आउँछन्', 'उनीहरू आएका थिए', 'b', 'करण "आए" को अकरण "आएनन्" हुन्छ।'),
+  ('44444444-0000-0000-0000-000000000213', 'नेपाली व्याकरणमा कर्मवाच्य वाक्य कुन हो?', 'रामले भात खायो।', 'रामद्वारा भात खाइयो।', 'राम भात खान्छ।', 'राम हिँड्यो।', 'b', 'कर्म + द्वारा/बाट + खाइयो रूप कर्मवाच्य हो।'),
+  ('44444444-0000-0000-0000-000000000213', '"सूर्य" शब्दको पर्यायवाची शब्द कुन होइन?', 'दिनकर', 'भास्कर', 'रवि', 'निशाकर', 'd', 'निशाकर भन्नाले चन्द्रमा बुझिन्छ, सूर्य होइन।'),
+  ('44444444-0000-0000-0000-000000000213', '"जसले मिहिनेत गर्छ, उसले सफलता पाउँछ" कुन प्रकारको वाक्य हो?', 'सरल वाक्य', 'मिश्र वाक्य', 'संयुक्त वाक्य', 'प्रश्नात्मक वाक्य', 'b', 'सापेक्ष संयोजक (जसले...उसले) जोडिएको वाक्य मिश्र वाक्य हो।'),
+-- Engineering Math I
+  ('44444444-0000-0000-0000-000000000218', 'The Maclaurin series expansion of e^x is:', '1 - x + x²/2! - x³/3! + ...', '1 + x + x²/2! + x³/3! + ...', 'x - x³/3! + x⁵/5! - ...', '1 - x²/2! + x⁴/4! - ...', 'b', 'e^x = ∑ (xⁿ/n!) = 1 + x + x²/2! + x³/3! + ...'),
+  ('44444444-0000-0000-0000-000000000218', 'The rank of an identity matrix of order 3×3 is:', '0', '1', '2', '3', 'd', 'Rank of identity matrix Iₙ equals its dimension n = 3.'),
+  ('44444444-0000-0000-0000-000000000218', 'Evaluate lim(x→0) [(1 - cos x) / x²]:', '0', '1/2', '1', '2', 'b', 'Using L''Hopital''s Rule twice or Taylor series gives 1/2.'),
+  ('44444444-0000-0000-0000-000000000218', 'The eigenvalues of a diagonal matrix are:', 'All zeros', 'All ones', 'Its diagonal entries', 'Undefined', 'c', 'For a diagonal matrix, eigenvalues are its diagonal entries.'),
+  ('44444444-0000-0000-0000-000000000218', 'The radius of curvature ρ of a Cartesian curve y = f(x) is:', '(1 + y''²)^(3/2) / |y''''|', '(1 + y''²)^1/2 / |y''''|', '|y''''| / (1 + y''²)^(3/2)', '(1 + y'') / y''''', 'a', 'Standard formula for radius of curvature ρ = (1 + y''²)^(3/2) / |y''''|.'),
+  ('44444444-0000-0000-0000-000000000218', 'Two vectors A and B are orthogonal if their dot product A · B is equal to:', '1', '-1', '0', '∞', 'c', 'Orthogonal vectors have angle 90°, so A · B = |A||B|cos(90°) = 0.'),
+  ('44444444-0000-0000-0000-000000000218', 'Euler''s theorem for a homogeneous function z = f(x,y) of degree n states:', 'x ∂z/∂x + y ∂z/∂y = n z', 'x ∂z/∂x - y ∂z/∂y = n z', '∂²z/∂x² + ∂²z/∂y² = 0', 'x ∂z/∂y + y ∂z/∂x = z', 'a', 'Euler''s theorem statement for homogeneous functions.'),
+  ('44444444-0000-0000-0000-000000000218', 'A square matrix A is singular if its determinant |A| is:', 'Equal to 1', 'Equal to 0', 'Greater than 0', 'Negative', 'b', 'A matrix with det(A) = 0 is defined as singular.'),
+  ('44444444-0000-0000-0000-000000000218', 'The indefinite integral ∫ e^(2x) dx is equal to:', 'e^(2x) + C', '2 e^(2x) + C', '½ e^(2x) + C', '¼ e^(2x) + C', 'c', '∫ e^(ax) dx = (1/a) e^(ax) + C.'),
+  ('44444444-0000-0000-0000-000000000218', 'Partial derivative ∂/∂x of f(x,y) = x² y³ treating y as constant is:', '2x y³', '3x² y²', '2x + 3y²', '6xy', 'a', 'Differentiating x² with respect to x gives 2x, holding y³ constant.'),
+-- C Programming Sem 1
+  ('44444444-0000-0000-0000-000000000219', 'Which operator in C dereferences a pointer variable to access its pointed value?', '&', '*', '->', '.', 'b', 'The dereference operator * accesses the value stored at a pointer address.'),
+  ('44444444-0000-0000-0000-000000000219', 'Which standard C library function allocates memory dynamically from the heap?', 'calloc()', 'malloc()', 'realloc()', 'All of the above', 'd', 'malloc(), calloc(), and realloc() are all dynamic memory allocation functions in C.'),
+  ('44444444-0000-0000-0000-000000000219', 'Which header file must be included to use malloc() and exit() in C?', '<stdio.h>', '<stdlib.h>', '<string.h>', '<math.h>', 'b', '<stdlib.h> declares memory management and utility functions.'),
+  ('44444444-0000-0000-0000-000000000219', 'Which arrow operator is used to access structure members using a pointer to that structure?', '.', '->', '*', '&', 'b', 'ptr->member is shorthand for (*ptr).member.'),
+  ('44444444-0000-0000-0000-000000000219', 'Which mode in fopen() opens a file for appending data at the end without truncating?', '"r"', '"w"', '"a"', '"r+"', 'c', '"a" opens a file for appending; output is appended at the end.'),
+  ('44444444-0000-0000-0000-000000000219', 'What character automatically terminates every C string in memory?', '\n', '\0', '\t', ';', 'b', 'The null terminator character \0 marks the end of a C string array.'),
+  ('44444444-0000-0000-0000-000000000219', 'What is the return value of sizeof(char) in any C compiler standard?', '1', '2', '4', 'Varies by system', 'a', 'By C standard definition, sizeof(char) is always exactly 1 byte.'),
+  ('44444444-0000-0000-0000-000000000219', 'A function that calls itself directly or indirectly is known as a:', 'Nested function', 'Recursive function', 'Inline function', 'Callback function', 'b', 'Recursion occurs when a function calls itself.'),
+  ('44444444-0000-0000-0000-000000000219', 'Which bitwise operator performs logical AND on individual bits of integers?', '&&', '&', '|', '^', 'b', '& is bitwise AND, while && is logical AND.'),
+  ('44444444-0000-0000-0000-000000000219', 'What is the return type of malloc() function in C?', 'int*', 'char*', 'void*', 'float*', 'c', 'malloc() returns a void pointer (generic pointer) which can be cast to any pointer type.'),
+-- Anatomy Year 1 MBBS
+  ('44444444-0000-0000-0000-000000000105', 'Which cranial nerve provides motor innervation to the muscles of mastication?', 'CN V (Trigeminal)', 'CN VII (Facial)', 'CN IX (Glossopharyngeal)', 'CN XII (Hypoglossal)', 'a', 'Mandibular branch of Trigeminal nerve (CN V3) innervates muscles of mastication.'),
+  ('44444444-0000-0000-0000-000000000105', 'What is the largest organ in the human body by surface area and weight?', 'Liver', 'Brain', 'Skin', 'Lungs', 'c', 'Skin (integumentary system) is the largest human body organ.'),
+  ('44444444-0000-0000-0000-000000000105', 'Which major brainstem structure passes through the foramen magnum of the occipital bone?', 'Cerebellum', 'Medulla oblongata', 'Midbrain', 'Pons', 'b', 'Medulla oblongata transitions into the spinal cord at the foramen magnum.'),
+  ('44444444-0000-0000-0000-000000000105', 'What type of epithelial tissue lines the luminal surface of the human urinary bladder?', 'Simple squamous', 'Stratified columnar', 'Transitional epithelium (Urothelium)', 'Pseudostratified', 'c', 'Transitional epithelium expands and contracts with bladder filling.'),
+  ('44444444-0000-0000-0000-000000000105', 'Which tarsal bone forms the heel of the human foot?', 'Talus', 'Navicular', 'Calcaneus', 'Cuboid', 'c', 'Calcaneus is the largest tarsal bone forming the heel.'),
+  ('44444444-0000-0000-0000-000000000105', 'Which heart valve guards the orifice between the left atrium and left ventricle?', 'Tricuspid valve', 'Mitral (Bicuspid) valve', 'Aortic valve', 'Pulmonary valve', 'b', 'The Mitral/Bicuspid valve prevents backflow from left ventricle to left atrium.'),
+  ('44444444-0000-0000-0000-000000000105', 'Injury to which peripheral nerve results in the clinical sign known as "Wrist Drop"?', 'Median nerve', 'Ulnar nerve', 'Radial nerve', 'Axillary nerve', 'c', 'Radial nerve innervates wrist extensors; damage causes wrist drop.'),
+  ('44444444-0000-0000-0000-000000000105', 'How many cervical vertebrae are present in a normal human vertebral column?', '5', '7', '12', '4', 'b', 'Humans have 7 cervical vertebrae (C1–C7).'),
+  ('44444444-0000-0000-0000-000000000105', 'Which major blood vessel supplies oxygenated blood to head and neck structures?', 'Subclavian artery', 'Common carotid artery', 'Vertebral artery', 'Jugular vein', 'b', 'Common carotid artery branches into internal and external carotids supplying head and neck.'),
+  ('44444444-0000-0000-0000-000000000105', 'The largest lymphatic vessel draining lymph into the left venous system is the:', 'Right lymphatic duct', 'Thoracic duct', 'Cisterna chyli', 'Inguinal lymph duct', 'b', 'Thoracic duct drains lymph from ~3/4 of the body into the left subclavian vein junction.'),
+-- Biology Gr 12
+  ('44444444-0000-0000-0000-000000000200', 'Which law of Mendel states that alleles segregate randomly during gamete formation?', 'Law of Dominance', 'Law of Segregation', 'Law of Independent Assortment', 'Law of Inheritance', 'b', 'Mendel''s 1st law is the Law of Segregation.'),
+  ('44444444-0000-0000-0000-000000000200', 'Human blood group AB is a classic example of:', 'Incomplete Dominance', 'Codominance', 'Polygenic Inheritance', 'Pleiotropy', 'b', 'Both A and B alleles are fully expressed in AB blood type.'),
+  ('44444444-0000-0000-0000-000000000200', 'Who is universally acknowledged as the Father of Genetics?', 'Charles Darwin', 'Gregor Johann Mendel', 'Hugo de Vries', 'Thomas Hunt Morgan', 'b', 'Gregor Mendel discovered fundamental laws of inheritance through pea plant experiments.'),
+  ('44444444-0000-0000-0000-000000000200', 'Which organelle is known as the powerhouse of the cell?', 'Nucleus', 'Mitochondria', 'Ribosome', 'Golgi body', 'b', 'Mitochondria produce ATP through oxidative phosphorylation.'),
+  ('44444444-0000-0000-0000-000000000200', 'The double helical structure of DNA was elucidated in 1953 by:', 'Robert Brown', 'Watson and Crick', 'Sutton and Boveri', 'Avery, MacLeod and McCarty', 'b', 'James Watson and Francis Crick discovered the DNA double helix.'),
+  ('44444444-0000-0000-0000-000000000200', 'Which enzyme unzips the double-stranded DNA helix during replication?', 'DNA Polymerase', 'Helicase', 'Ligase', 'RNA Polymerase', 'b', 'DNA Helicase breaks hydrogen bonds between base pairs to unwind the helix.'),
+  ('44444444-0000-0000-0000-000000000200', 'The Theory of Evolution by Natural Selection was published by:', 'Jean-Baptiste Lamarck', 'Charles Darwin', 'Gregor Mendel', 'Hugo de Vries', 'b', 'Charles Darwin published "On the Origin of Species" in 1859.'),
+  ('44444444-0000-0000-0000-000000000200', 'Total number of chromosomes present in a normal human somatic cell is:', '23', '46', '44', '48', 'b', 'Human somatic cells contain 46 chromosomes (23 pairs).'),
+  ('44444444-0000-0000-0000-000000000200', 'Herbivores feeding directly on green plants occupy which trophic level?', 'Primary producers', 'Primary consumers', 'Secondary consumers', 'Decomposers', 'b', 'Herbivores are primary consumers at Trophic Level 2.'),
+  ('44444444-0000-0000-0000-000000000200', 'Small circular extrachromosomal DNA used as vector in biotechnology is a:', 'Phagosome', 'Plasmid', 'Transposon', 'Cosmid', 'b', 'Plasmids are bacterial circular DNA units widely used as cloning vectors.'),
+-- CS Gr 12
+  ('44444444-0000-0000-0000-000000000202', 'Which data structure follows LIFO (Last In First Out) principle?', 'Queue', 'Stack', 'Array', 'Linked List', 'b', 'Stack operates on Last-In First-Out principle.'),
+  ('44444444-0000-0000-0000-000000000202', 'Which OOP concept allows a subclass to inherit properties from a parent class?', 'Polymorphism', 'Encapsulation', 'Inheritance', 'Abstraction', 'c', 'Inheritance allows child classes to inherit fields and methods.'),
+  ('44444444-0000-0000-0000-000000000202', 'SQL command used to retrieve data records from a database table is:', 'UPDATE', 'INSERT', 'SELECT', 'DELETE', 'c', 'SELECT query fetches data matching query criteria.'),
+  ('44444444-0000-0000-0000-000000000202', 'Worst-case time complexity of QuickSort algorithm is:', 'O(n log n)', 'O(n)', 'O(n²)', 'O(1)', 'c', 'Worst case QuickSort is O(n²) when pivot selection is unbalanced.'),
+  ('44444444-0000-0000-0000-000000000202', 'Which linear data structure operates on FIFO (First In First Out)?', 'Stack', 'Queue', 'Tree', 'Graph', 'b', 'Queue processes elements in First-In First-Out order.'),
+  ('44444444-0000-0000-0000-000000000202', 'Which HTML tag is used to create a hyperlink on a webpage?', '<link>', '<a>', '<href>', '<url>', 'b', '<a href="..."> specifies a hyperlink destination.'),
+  ('44444444-0000-0000-0000-000000000202', 'A Primary Key in a relational database table must be:', 'Unique and allow NULLs', 'Unique and NOT NULL', 'Foreign key', 'Duplicate value', 'b', 'Primary keys uniquely identify rows and cannot be NULL.'),
+  ('44444444-0000-0000-0000-000000000202', 'Packaging data members and methods into a single unit/class is:', 'Inheritance', 'Abstraction', 'Encapsulation', 'Polymorphism', 'c', 'Encapsulation binds code and data together while restricting access.'),
+  ('44444444-0000-0000-0000-000000000202', 'Which network protocol encrypts web traffic for secure communication?', 'HTTP', 'FTP', 'HTTPS', 'SMTP', 'c', 'HTTPS uses TLS/SSL encryption for secure HTTP data transfer.'),
+  ('44444444-0000-0000-0000-000000000202', 'Which CSS property is used to change font color of text?', 'font-color', 'text-style', 'color', 'background-color', 'c', 'The color property sets font color in CSS.'),
+-- Business Studies Gr 12
+  ('44444444-0000-0000-0000-000000000206', 'Who is widely regarded as the Father of Scientific Management?', 'Henri Fayol', 'F.W. Taylor', 'Peter Drucker', 'Elton Mayo', 'b', 'Frederick Winslow Taylor pioneered Scientific Management principles.'),
+  ('44444444-0000-0000-0000-000000000206', 'Which function of management involves setting goals and choosing how to achieve them?', 'Organizing', 'Planning', 'Controlling', 'Directing', 'a', 'Planning sets objectives and outlines actions to achieve them.'),
+  ('44444444-0000-0000-0000-000000000206', 'The term "Span of Control" in management refers to:', 'Time required to complete a task', 'Number of subordinates directly managed by a manager', 'Total authority of CEO', 'Financial budget range', 'b', 'Span of control is the number of employees directly supervised.'),
+  ('44444444-0000-0000-0000-000000000206', 'Which of the following is NOT one of the traditional 4 Ps of Marketing?', 'Product', 'Price', 'People', 'Promotion', 'c', 'Traditional 4 Ps: Product, Price, Place, Promotion.'),
+  ('44444444-0000-0000-0000-000000000206', 'Promotion of an existing employee to a higher post is an example of:', 'External recruitment', 'Internal recruitment', 'Off-the-job training', 'Demotion', 'b', 'Promotions and transfers are internal recruitment sources.'),
+  ('44444444-0000-0000-0000-000000000206', 'A business organization owned and managed by a single individual is a:', 'Partnership', 'Sole Proprietorship', 'Joint Stock Company', 'Cooperative', 'b', 'Sole proprietorship is owned and operated by one person.'),
+  ('44444444-0000-0000-0000-000000000206', 'Maslow''s Hierarchy of Needs places which need at the top of the pyramid?', 'Safety needs', 'Social needs', 'Self-Actualization needs', 'Esteem needs', 'c', 'Self-actualization is the highest level in Maslow''s pyramid.'),
+  ('44444444-0000-0000-0000-000000000206', 'Deming''s continuous improvement quality model is represented by:', 'SWOT', 'PDCA (Plan-Do-Check-Act)', 'PEST', 'BCG Matrix', 'b', 'PDCA cycle drives continuous quality management.'),
+  ('44444444-0000-0000-0000-000000000206', 'Document defining internal rules and regulations of a public limited company is:', 'Prospectus', 'Memorandum of Association', 'Articles of Association', 'Certificate of Incorporation', 'c', 'Articles of Association govern internal management operations.'),
+  ('44444444-0000-0000-0000-000000000206', 'Leadership style where leader makes decisions independently without consulting followers is:', 'Democratic', 'Autocratic', 'Laissez-faire', 'Transformational', 'b', 'Autocratic leaders exercise sole decision-making authority.'),
+-- Accountancy Gr 12
+  ('44444444-0000-0000-0000-000000000204', 'Which financial statement reports a business entity''s assets, liabilities, and equity at a specific point in time?', 'Income Statement', 'Trial Balance', 'Balance Sheet', 'Cash Flow Statement', 'c', 'Balance Sheet summarizes financial position at a given date.'),
+  ('44444444-0000-0000-0000-000000000204', 'Goodwill of a business firm is classified as:', 'Current Asset', 'Intangible Fixed Asset', 'Fictitious Asset', 'Tangible Asset', 'b', 'Goodwill is an intangible non-current asset.'),
+  ('44444444-0000-0000-0000-000000000204', 'What is the golden rule for Nominal Accounts?', 'Debit receiver, credit giver', 'Debit what comes in, credit what goes out', 'Debit all expenses/losses, credit all incomes/gains', 'None of the above', 'c', 'Nominal account rule: Debit expenses/losses, Credit incomes/gains.'),
+  ('44444444-0000-0000-0000-000000000204', 'Part of authorized capital offered to the public for subscription is:', 'Issued Capital', 'Called-up Capital', 'Paid-up Capital', 'Reserve Capital', 'a', 'Issued capital is the portion offered for public subscription.'),
+  ('44444444-0000-0000-0000-000000000204', 'A Cash Flow Statement categorizes cash flows into three activities:', 'Current, Non-current, Fixed', 'Operating, Investing, Financing', 'Direct, Indirect, Mixed', 'Internal, External, Bank', 'b', 'Cash flows are divided into Operating, Investing, and Financing activities.'),
+  ('44444444-0000-0000-0000-000000000204', 'Trial Balance is prepared to check the arithmetical accuracy of:', 'Ledger accounts', 'Journal entries', 'Cash book', 'Bank statement', 'a', 'Trial Balance checks debit and credit equality across ledger accounts.'),
+  ('44444444-0000-0000-0000-000000000204', 'Excess of total assets over total liabilities represents:', 'Net Profit', 'Capital / Equity', 'Gross Loss', 'Working Capital', 'b', 'Capital = Total Assets - Total Liabilities.'),
+  ('44444444-0000-0000-0000-000000000204', 'Depreciation method where equal amount of depreciation is written off every year is:', 'Diminishing Balance Method', 'Straight Line Method', 'Annuity Method', 'Revaluation Method', 'b', 'Straight Line Method allocates equal depreciation expense annually.'),
+  ('44444444-0000-0000-0000-000000000204', 'Discount allowed by manufacturer to retailer at the time of bulk purchase is:', 'Cash discount', 'Trade discount', 'Rebate', 'Commission', 'b', 'Trade discount is given on bulk sales and not recorded separately in ledger.'),
+  ('44444444-0000-0000-0000-000000000204', 'Which accounting concept assumes a business will continue operating indefinitely?', 'Going Concern Concept', 'Money Measurement Concept', 'Dual Aspect Concept', 'Matching Concept', 'a', 'Going Concern principle assumes business continuity into foreseeable future.'),
+-- Economics Gr 12
+  ('44444444-0000-0000-0000-000000000205', 'Gross Domestic Product (GDP) measures:', 'Total money in circulation', 'Total value of final goods/services produced in a country', 'Government expenditure', 'Total exports minus imports', 'b', 'GDP is the market value of final goods/services produced within domestic territory.'),
+  ('44444444-0000-0000-0000-000000000205', 'Inflation is defined as:', 'Continuous decrease in general price level', 'Sustained rise in general price level', 'Increase in unemployment rate', 'Balance of payment surplus', 'b', 'Inflation is a sustained increase in the general price level.'),
+  ('44444444-0000-0000-0000-000000000205', 'The central bank of Nepal responsible for monetary policy is:', 'Rastriya Banijya Bank', 'Nepal Bank Limited', 'Nepal Rastra Bank', 'Agricultural Development Bank', 'c', 'Nepal Rastra Bank (NRB) is the central bank of Nepal founded in 2013 B.S.'),
+  ('44444444-0000-0000-0000-000000000205', 'The Law of Demand states that, ceteris paribus:', 'As price rises, quantity demanded rises', 'As price rises, quantity demanded falls', 'Price and demand move in same direction', 'Demand is independent of price', 'b', 'Price and quantity demanded are inversely related.'),
+  ('44444444-0000-0000-0000-000000000205', 'Microeconomics focuses primarily on the study of:', 'National income & aggregate demand', 'Individual economic units and specific markets', 'International trade policies', 'Global economic growth', 'b', 'Microeconomics examines individual consumers, firms, and price mechanisms.'),
+  ('44444444-0000-0000-0000-000000000205', 'The value of the next best alternative foregone when making a choice is called:', 'Marginal cost', 'Opportunity cost', 'Sunk cost', 'Fixed cost', 'b', 'Opportunity cost is the value of the foregone alternative.'),
+  ('44444444-0000-0000-0000-000000000205', 'Fiscal policy in Nepal is formulated and announced by:', 'Nepal Rastra Bank', 'Ministry of Finance', 'National Planning Commission', 'Commercial Banks', 'b', 'Ministry of Finance formulates annual budget and fiscal policy.'),
+  ('44444444-0000-0000-0000-000000000205', 'A market structure with only a single seller of a unique product is:', 'Perfect competition', 'Monopoly', 'Oligopoly', 'Monopolistic competition', 'b', 'Monopoly has a single seller with high entry barriers.'),
+  ('44444444-0000-0000-0000-000000000205', 'Price Elasticity of Demand formula is:', '% Change in Price / % Change in Quantity', '% Change in Quantity Demanded / % Change in Price', 'Change in Price / Change in Income', 'Quantity / Price', 'b', 'E_p = (% Δ Q) / (% Δ P).'),
+  ('44444444-0000-0000-0000-000000000205', 'The largest source of indirect tax revenue for the Nepal government is:', 'Income Tax', 'Value Added Tax (VAT)', 'Property Tax', 'Gift Tax', 'b', 'VAT contributes significantly to Nepal government indirect revenue.'),
+-- SEE Math
+  ('44444444-0000-0000-0000-000000000207', 'If the radius of a circle is 7 cm, its area is: (use π = 22/7)', '44 cm²', '154 cm²', '49 cm²', '88 cm²', 'b', 'Area = πr² = (22/7) × 49 = 154 cm².'),
+  ('44444444-0000-0000-0000-000000000207', 'Formula for Compound Interest (CI) on Principal P at rate R% for T years is:', 'P × R × T / 100', 'P [(1 + R/100)ᵀ - 1]', 'P (1 + R/100)ᵀ', 'P [1 - (R/100)ᵀ]', 'b', 'CI = Amount - Principal = P [(1 + R/100)ᵀ - 1].'),
+  ('44444444-0000-0000-0000-000000000207', 'Probability of getting a head in a single toss of an unbiased coin is:', '0', '1/2', '1', '1/4', 'b', 'P(Head) = 1 favorable outcome / 2 total outcomes = 1/2.'),
+  ('44444444-0000-0000-0000-000000000207', 'The angle subtended by a semicircle at any point on its circumference is:', '45°', '60°', '90°', '180°', 'c', 'Thales''s theorem states angle in a semicircle is a right angle (90°).'),
+  ('44444444-0000-0000-0000-000000000207', 'Volume of a solid sphere of radius r is given by:', '4 π r²', '4/3 π r³', '2/3 π r³', 'π r² h', 'b', 'Volume of sphere = 4/3 π r³.'),
+  ('44444444-0000-0000-0000-000000000207', 'The HCF of 12 and 18 is:', '2', '3', '6', '36', 'c', '12 = 2²×3, 18 = 2×3²; HCF = 2×3 = 6.'),
+  ('44444444-0000-0000-0000-000000000207', 'Value of sin²θ + cos²θ for any angle θ is:', '0', '1', '2', 'tan θ', 'b', 'Pythagorean trigonometric identity: sin²θ + cos²θ = 1.'),
+  ('44444444-0000-0000-0000-000000000207', 'Midpoint of the line segment joining points (2,4) and (6,8) is:', '(4,6)', '(3,5)', '(8,12)', '(2,2)', 'a', 'Midpoint = ((2+6)/2, (4+8)/2) = (4,6).'),
+  ('44444444-0000-0000-0000-000000000207', 'Total surface area of a cube having side length a is:', '4a²', '6a²', 'a³', '12a', 'b', 'A cube has 6 square faces, so total area = 6a².'),
+  ('44444444-0000-0000-0000-000000000207', 'The median of the data set: 3, 5, 7, 9, 11 is:', '5', '7', '9', '6', 'b', 'Arranged in order, middle 3rd term is 7.'),
+-- SEE Nepali
+  ('44444444-0000-0000-0000-000000000217', '"पानी" शब्द कुन प्रकारको नाम हो?', 'व्यक्तिवाचक नाम', 'द्रव्यवाचक नाम', 'समूहवाचक नाम', 'भाववाचक नाम', 'b', 'गन्न नसकिने, नाप्न वा तौलन सकिने वस्तु द्रव्यवाचक नाम हो।'),
+  ('44444444-0000-0000-0000-000000000217', '"पढ्नु" धातुबाट बनेको सामान्य वर्तमान कालको प्रथम पुरुष एकवचन रूप कुन हो?', 'पढ्छु', 'पढ्छौ', 'पढ्छ', 'पढ्नुहुन्छ', 'a', 'प्रथम पुरुष एकवचन (म) सँग "पढ्छु" प्रयोग हुन्छ।'),
+  ('44444444-0000-0000-0000-000000000217', 'आदिकवि भानुभक्त आचार्यले नेपालीमा अनुवाद गरेको प्रसिद्ध ग्रन्थ कुन हो?', 'महाभारत', 'रामायण', 'गीता', 'मुनामदन', 'b', 'भानुभक्तले अध्यात्म रामायणलाई नेपाली भाषामा अनुवाद गरेका थिए।'),
+  ('44444444-0000-0000-0000-000000000217', 'तलका मध्ये व्याकरणिक दृष्टिले शुद्ध वाक्य छान्नुहोस्:', 'राम बिध्यालय जान्छ।', 'राम विद्यालय जान्छ।', 'राम बिद्यालय जान्छन्।', 'राम बिध्यालय जान्छन।', 'b', 'शुद्ध शब्द "विद्यालय" र एकवचन क्रिया "जान्छ" प्रयोग भएको वाक्य छ।'),
+  ('44444444-0000-0000-0000-000000000217', '"चन्द्रमा" शब्दको सही पर्यायवाची शब्द कुन हो?', 'रवि', 'शशी', 'भास्कर', 'पवन', 'b', 'शशी चन्द्रमाको पर्यायवाची शब्द हो।'),
+  ('44444444-0000-0000-0000-000000000217', 'तलका मध्ये विशेषण शब्द कुन हो?', 'राम', 'अग्लो', 'काठमाडौँ', 'हिँड्नु', 'b', 'अग्लो शब्दले नामको गुण/विशेषता बुझाउँछ।'),
+  ('44444444-0000-0000-0000-000000000217', '"उसले पढ्यो" वाक्यको अकरण रूप कुन हो?', 'उसले पढेछ', 'उसले पढेको थियो', 'उसले पढेन', 'उसले पढ्दैन', 'c', 'भूतकाल सामान्य पक्षको अकरण रूप "पढेन" हुन्छ।'),
+  ('44444444-0000-0000-0000-000000000217', '"विद्यालय" शब्दको सही सन्धि विच्छेद कुन हो?', 'विद् + आलय', 'विद्या + आलय', 'विद्य + लय', 'विद्या + लय', 'b', 'विद्या + आलय = विद्यालय (दीर्घ सन्धि)।'),
+  ('44444444-0000-0000-0000-000000000217', 'नेपाली व्याकरणमा कर्मवाच्य वाक्य कुन हो?', 'विद्यार्थीहरूले चित्र बनाए।', 'विद्यार्थीहरूद्वारा चित्र बनाइयो।', 'विद्यार्थीहरू चित्र बनाउँछन्।', 'विद्यार्थीहरू हाँसे।', 'b', 'कर्म + द्वारा + बनाइयो रूप कर्मवाच्य हो।'),
+  ('44444444-0000-0000-0000-000000000217', '"रात" शब्दको विपरीतार्थी शब्द कुन हो?', 'साँझ', 'दिन', 'बिहान', 'अँध्यारो', 'b', 'रातको उल्टो अर्थ दिन हुन्छ।'),
+-- SEE Social
+  ('44444444-0000-0000-0000-000000000209', 'Who was the King who led the unification movement of modern Nepal?', 'Prithvi Narayan Shah', 'Mahendra Bir Bikram Shah', 'Birendra Bir Bikram Shah', 'Ram Shah', 'a', 'King Prithvi Narayan Shah unified small principalities into modern Nepal.'),
+  ('44444444-0000-0000-0000-000000000209', 'How many Local Levels (Palikas) are present in federal Nepal?', '750', '753', '77', '700', 'b', 'Nepal has 753 local levels (Metropolitan, Sub-metro, Municipalities, Rural Municipalities).'),
+  ('44444444-0000-0000-0000-000000000209', 'The headquarters of the United Nations (UN) is located in:', 'Geneva, Switzerland', 'New York, USA', 'London, UK', 'Paris, France', 'b', 'UN headquarters is located in New York City.'),
+  ('44444444-0000-0000-0000-000000000209', 'Which climate zone is predominantly found in the Terai region of Nepal?', 'Tropical climate', 'Subtropical climate', 'Temperate climate', 'Alpine climate', 'a', 'The southern Terai plains have a tropical climate with high temperatures.'),
+  ('44444444-0000-0000-0000-000000000209', 'Which UN organ holds primary responsibility for maintaining international peace and security?', 'General Assembly', 'Security Council', 'Secretariat', 'Economic Council', 'b', 'UN Security Council maintains international peace and security.'),
+  ('44444444-0000-0000-0000-000000000209', 'Who was the first President of the Federal Democratic Republic of Nepal?', 'Dr. Ram Baran Yadav', 'Bidya Devi Bhandari', 'Ram Chandra Poudel', 'Girija Prasad Koirala', 'a', 'Dr. Ram Baran Yadav served as Nepal''s 1st President (2008–2015).'),
+  ('44444444-0000-0000-0000-000000000209', 'The highest waterfall in Nepal is:', 'Hyatung Falls', 'Davis Falls', 'Suligad Waterfall', 'Pokhara Waterfall', 'a', 'Hyatung Falls (365 m) in Terhathum district is the highest waterfall in Nepal.'),
+  ('44444444-0000-0000-0000-000000000209', 'Which organ of Nepal government is responsible for making laws?', 'Executive', 'Legislature (Federal Parliament)', 'Judiciary', 'Constitutional Council', 'b', 'The Legislature (Federal Parliament) enacts laws.'),
+  ('44444444-0000-0000-0000-000000000209', 'Sustainable Development Goal 4 (SDG 4) focuses on:', 'No Poverty', 'Zero Hunger', 'Quality Education', 'Clean Water', 'c', 'SDG 4 aims to ensure inclusive and equitable quality education.'),
+  ('44444444-0000-0000-0000-000000000209', 'International Human Rights Day is observed worldwide on:', 'December 10', 'October 24', 'June 5', 'March 8', 'a', 'December 10 marks the 1948 Universal Declaration of Human Rights.'),
+-- SEE English
+  ('44444444-0000-0000-0000-000000000208', 'Choose the correct passive voice: "She cooks food every morning."', 'Food is cooked by her every morning.', 'Food was cooked by her every morning.', 'Food is being cooked by her every morning.', 'Food has been cooked by her.', 'a', 'Simple present passive: Object + is/am/are + V3 + by + Agent.'),
+  ('44444444-0000-0000-0000-000000000208', 'Supply the correct question tag: "He is very smart, ___?"', 'is he?', 'isn''t he?', 'doesn''t he?', 'wasn''t he?', 'b', 'Positive statement with auxiliary "is" takes negative tag "isn''t he?".'),
+  ('44444444-0000-0000-0000-000000000208', 'Choose the correct preposition: "The frightened dog jumped ___ the deep river."', 'in', 'into', 'on', 'at', 'b', 'Motion entering into an enclosed volume/water uses preposition "into".'),
+  ('44444444-0000-0000-0000-000000000208', 'Reported speech: He said, "I have finished my homework."', 'He said that he has finished his homework.', 'He said that he had finished his homework.', 'He told that he finished his homework.', 'He said I had finished my homework.', 'b', 'Present perfect changes to past perfect in indirect speech.'),
+  ('44444444-0000-0000-0000-000000000208', 'Select the correct article: "Copper is ___ useful metal."', 'a', 'an', 'the', 'no article', 'a', '"Useful" starts with a consonant sound (/juːsfəl/), taking article "a".'),
+  ('44444444-0000-0000-0000-000000000208', 'Subject-verb agreement: "Bread and butter ___ his favorite breakfast."', 'is', 'are', 'were', 'have been', 'a', 'Bread and butter expresses a single compound idea (breakfast), taking singular "is".'),
+  ('44444444-0000-0000-0000-000000000208', 'Identify the correctly spelled word:', 'Recieve', 'Receive', 'Receve', 'Receeve', 'b', 'Rule: I before E except after C → Receive.'),
+  ('44444444-0000-0000-0000-000000000208', 'Antonym of the word "Ancient" is:', 'Old', 'Modern', 'Historic', 'Traditional', 'b', 'Modern is the direct antonym of ancient.'),
+  ('44444444-0000-0000-0000-000000000208', 'Causative structure: "The teacher made the students ___ the story aloud."', 'read', 'to read', 'reading', 'readed', 'a', 'Make + object takes bare infinitive (read).'),
+  ('44444444-0000-0000-0000-000000000208', 'Relative pronoun: "The farmer ___ cattle were lost looked worried."', 'who', 'whom', 'whose', 'which', 'c', 'Possessive relative pronoun for persons is "whose".'),
+-- IOE Physics
+  ('44444444-0000-0000-0000-000000000210', 'Two perpendicular forces of 3 N and 4 N act on a body. The magnitude of their resultant is:', '7 N', '1 N', '5 N', '12 N', 'c', 'R = √(3² + 4²) = 5 N.'),
+  ('44444444-0000-0000-0000-000000000210', 'The escape velocity from Earth''s surface (g = 9.8 m/s², R = 6400 km) is approximately:', '9.8 km/s', '11.2 km/s', '8.0 km/s', '7.9 km/s', 'b', 'vₑ = √(2gR) ≈ 11.2 km/s.'),
+  ('44444444-0000-0000-0000-000000000210', 'Dimensional formula for Planck''s constant h is:', 'ML²T⁻²', 'ML²T⁻¹', 'MLT⁻¹', 'M⁰L²T⁻²', 'b', 'h = E/ν → [Energy]/[Frequency] = (ML²T⁻²)/(T⁻¹) = ML²T⁻¹.'),
+  ('44444444-0000-0000-0000-000000000210', 'Frequency of commercial alternating current (AC) supply in Nepal is:', '50 Hz', '60 Hz', '100 Hz', '120 Hz', 'a', 'Nepal electricity grid operates at 50 Hz frequency.'),
+  ('44444444-0000-0000-0000-000000000210', 'In an isothermal process of an ideal gas, the change in internal energy ΔU is:', 'Positive', 'Negative', 'Zero', 'Infinite', 'c', 'Internal energy U depends only on temperature for ideal gas; ΔT=0 → ΔU=0.'),
+  ('44444444-0000-0000-0000-000000000210', 'De Broglie wavelength λ of a particle of momentum p is given by:', 'λ = hp', 'λ = h/p', 'λ = p/h', 'λ = h/p²', 'b', 'de Broglie relationship λ = h/p.'),
+  ('44444444-0000-0000-0000-000000000210', 'For total internal reflection to occur, light must travel from:', 'Rarer to denser medium with i > C', 'Denser to rarer medium with i > C', 'Denser to rarer medium with i < C', 'Rarer to denser medium with i < C', 'b', 'Total internal reflection requires denser → rarer medium and incidence angle i > critical angle C.'),
+  ('44444444-0000-0000-0000-000000000210', 'Condition for electrical resonance in a series LCR circuit is:', 'XL = XC', 'XL = 0', 'XC = 0', 'R = 0', 'a', 'At resonance, inductive reactance XL equals capacitive reactance XC (ωL = 1/ωC).'),
+  ('44444444-0000-0000-0000-000000000210', 'Moment of inertia of a uniform solid sphere of mass M and radius R about its diameter is:', '1/2 MR²', '2/5 MR²', '2/3 MR²', 'MR²', 'b', 'I = 2/5 MR² for solid sphere about diameter.'),
+  ('44444444-0000-0000-0000-000000000210', 'The half-life T₁/₂ of a radioactive sample with decay constant λ is:', 'ln(2) / λ ≈ 0.693 / λ', 'λ / ln(2)', '1 / λ', '2λ', 'a', 'T₁/₂ = ln(2)/λ = 0.693/λ.'),
+-- IOE Math
+  ('44444444-0000-0000-0000-000000000211', 'The derivative of sin(x) with respect to x is:', '-cos(x)', 'cos(x)', 'tan(x)', '-sin(x)', 'b', 'd/dx[sin(x)] = cos(x).'),
+  ('44444444-0000-0000-0000-000000000211', 'Value of e^(iπ) according to Euler''s identity is:', '1', '-1', 'i', '-i', 'b', 'Euler''s identity: e^(iπ) + 1 = 0 → e^(iπ) = -1.'),
+  ('44444444-0000-0000-0000-000000000211', 'The acute angle between lines y = x and y = -x is:', '30°', '45°', '60°', '90°', 'd', 'Slopes are m₁ = 1, m₂ = -1; m₁m₂ = -1 → lines are perpendicular (90°).'),
+  ('44444444-0000-0000-0000-000000000211', 'Derivative of e^(x²) with respect to x is:', 'e^(x²)', '2x e^(x²)', 'x e^(x²)', '2 e^(x²)', 'b', 'By chain rule, d/dx[e^(x²)] = e^(x²) · d/dx(x²) = 2x e^(x²).'),
+  ('44444444-0000-0000-0000-000000000211', 'Value of the definite integral ∫₀^(π/2) sin(x) dx is:', '0', '1', '2', 'π/2', 'b', '[-cos(x)]₀^(π/2) = -cos(π/2) - (-cos(0)) = 0 + 1 = 1.'),
+  ('44444444-0000-0000-0000-000000000211', 'The eccentricity e of any parabola is always equal to:', 'e < 1', 'e = 1', 'e > 1', 'e = 0', 'b', 'By definition, a parabola has eccentricity e = 1.'),
+  ('44444444-0000-0000-0000-000000000211', 'If ⁿC₃ = ⁿC₇, then the value of n is:', '7', '10', '21', '35', 'b', 'Combinations identity: ⁿCₐ = ⁿC_b → a + b = n → 3 + 7 = 10.'),
+  ('44444444-0000-0000-0000-000000000211', 'Distance of point (1,2) from the line 3x + 4y - 11 = 0 is:', '0', '1', '2', '5', 'a', 'Distance d = |3(1) + 4(2) - 11| / √(3² + 4²) = |11 - 11|/5 = 0.'),
+  ('44444444-0000-0000-0000-000000000211', 'Sum of roots of quadratic equation ax² + bx + c = 0 is:', 'b/a', '-b/a', 'c/a', '-c/a', 'b', 'Vieta''s formulas: α + β = -b/a.'),
+  ('44444444-0000-0000-0000-000000000211', 'Value of limit lim(x→∞) (1 + 1/x)^x is:', '1', '0', 'e', '∞', 'c', 'Standard fundamental limit definition of base e.'),
+-- IOE Chemistry
+  ('44444444-0000-0000-0000-000000000220', 'Radioactive decay of unstable isotopes follows kinetics of which order?', 'Zero order', 'First order', 'Second order', 'Third order', 'b', 'Radioactive disintegration is a first-order nuclear reaction.'),
+  ('44444444-0000-0000-0000-000000000220', 'Which mineral is the primary ore for commercial extraction of Aluminum?', 'Hematite', 'Bauxite', 'Galena', 'Calamine', 'b', 'Bauxite (Al₂O₃·2H₂O) is the primary aluminum ore.'),
+  ('44444444-0000-0000-0000-000000000220', 'Finely divided metal used as catalyst in Haber''s process for ammonia synthesis is:', 'Nickel (Ni)', 'Platinum (Pt)', 'Iron (Fe)', 'Copper (Cu)', 'c', 'Finely divided iron with molybdenum promoter is used in Haber''s process.'),
+  ('44444444-0000-0000-0000-000000000220', 'Chemical formula of Plaster of Paris is:', 'CaSO₄·2H₂O', 'CaSO₄·½H₂O', 'CaCO₃', 'CaO', 'b', 'Plaster of Paris is Calcium Sulfate Hemihydrate (CaSO₄·½H₂O).'),
+  ('44444444-0000-0000-0000-000000000220', 'IUPAC name of acetone (CH₃-CO-CH₃) is:', 'Propanal', 'Propan-2-one', 'Ethanol', 'Ethanoic acid', 'b', 'Acetone is a 3-carbon ketone named Propan-2-one.'),
+  ('44444444-0000-0000-0000-000000000220', 'Hybridization of central Sulfur atom in SF₆ molecule is:', 'sp³', 'sp³d', 'sp³d²', 'dsp²', 'c', 'SF₆ has 6 bonding pairs forming octahedral shape (sp³d²).'),
+  ('44444444-0000-0000-0000-000000000220', 'Gas evolved when zinc metal reacts with cold dilute nitric acid (HNO₃) is:', 'H₂', 'NO', 'N₂O (Laughing gas)', 'NO₂', 'c', '4Zn + 10HNO₃(dilute) → 4Zn(NO₃)₂ + N₂O + 5H₂O.'),
+  ('44444444-0000-0000-0000-000000000220', 'Lucas reagent used to distinguish primary, secondary and tertiary alcohols consists of:', 'Conc. HCl + Anhydrous ZnCl₂', 'Conc. H₂SO₄ + K₂Cr₂O₇', 'Dilute HCl + FeCl₃', 'KMnO₄ + NaOH', 'a', 'Lucas reagent = Anhydrous ZnCl₂ dissolved in concentrated HCl.'),
+  ('44444444-0000-0000-0000-000000000220', 'The pH of a 0.01 M aqueous solution of strong acid HCl is:', '1', '2', '3', '7', 'b', '[H⁺] = 10⁻² M → pH = -log(10⁻²) = 2.'),
+  ('44444444-0000-0000-0000-000000000220', 'Which organic compound contains a chiral carbon and exhibits optical activity?', 'Glycine', 'Lactic acid', 'Acetic acid', 'Ethanol', 'b', 'Lactic acid [CH₃-CH(OH)-COOH] has a chiral carbon attached to 4 different groups.'),
+-- Physiology MBBS
+  ('44444444-0000-0000-0000-000000000212', 'Normal resting cardiac output in a healthy adult human is approximately:', '2 L/min', '5 L/min', '8 L/min', '10 L/min', 'b', 'Normal CO = Stroke volume (70mL) × HR (72 bpm) ≈ 5 L/min.'),
+  ('44444444-0000-0000-0000-000000000212', 'The primary physiological pacemaker of the human heart is the:', 'AV Node', 'Sinoatrial (SA) Node', 'Bundle of His', 'Purkinje fibers', 'b', 'SA node generates spontaneous electrical impulses at ~70-80 bpm.'),
+  ('44444444-0000-0000-0000-000000000212', 'The functional and structural microscopic unit of the human kidney is the:', 'Glomerulus', 'Nephron', 'Collecting duct', 'Loop of Henle', 'b', 'Each human kidney contains ~1 million nephrons.'),
+  ('44444444-0000-0000-0000-000000000212', 'Which hormone increases water reabsorption in renal collecting tubules?', 'Aldosterone', 'Antidiuretic Hormone (ADH / Vasopressin)', 'Renin', 'ANP', 'b', 'ADH inserts aquaporin-2 channels in collecting ducts to reabsorb water.'),
+  ('44444444-0000-0000-0000-000000000212', 'Normal arterial blood pH range in human body is maintained between:', '6.80 – 7.00', '7.35 – 7.45', '7.50 – 7.80', '7.00 – 7.20', 'b', 'Normal arterial blood pH is tightly regulated at 7.35–7.45.'),
+  ('44444444-0000-0000-0000-000000000212', 'Iron-containing metalloprotein in red blood cells that transports oxygen is:', 'Myoglobin', 'Hemoglobin', 'Transferrin', 'Ferritin', 'b', 'Hemoglobin transports O₂ from lungs to tissues.'),
+  ('44444444-0000-0000-0000-000000000212', 'The resting membrane potential of a typical large nerve fiber is approximately:', '-90 mV', '-70 mV', '0 mV', '+30 mV', 'b', 'Resting nerve membrane potential is -70 mV maintained by Na+/K+ ATPase.'),
+  ('44444444-0000-0000-0000-000000000212', 'Which pancreatic islet cells secrete the hormone insulin into bloodstream?', 'Alpha cells', 'Beta cells', 'Delta cells', 'F cells', 'b', 'Beta cells of Islets of Langerhans secrete insulin.'),
+  ('44444444-0000-0000-0000-000000000212', 'Enucleated cell fragments essential for blood clotting and hemostasis are:', 'Erythrocytes', 'Leukocytes', 'Platelets (Thrombocytes)', 'Monocytes', 'c', 'Platelets form the primary hemostatic plug at vascular injury sites.'),
+  ('44444444-0000-0000-0000-000000000212', 'Normal average Glomerular Filtration Rate (GFR) in adult humans is:', '50 mL/min', '125 mL/min', '250 mL/min', '500 mL/min', 'b', 'Normal GFR is ~125 mL/min (~180 L/day).'),
+-- Loksewa Mgmt & GK Officer
+  ('44444444-0000-0000-0000-000000000214', 'Which management function involves measuring actual performance and correcting deviations from plans?', 'Planning', 'Organizing', 'Directing', 'Controlling', 'd', 'Controlling measures performance against standards and takes corrective actions.'),
+  ('44444444-0000-0000-0000-000000000214', 'Max Weber''s classical theory of organization is based on the concept of:', 'Scientific Management', 'Bureaucracy', 'Human Relations', 'Systems Theory', 'b', 'Max Weber conceptualized Bureaucratic Organization.'),
+  ('44444444-0000-0000-0000-000000000214', 'In strategic planning, SWOC analysis stands for:', 'Strengths, Weaknesses, Opportunities, Challenges', 'System, Work, Organization, Control', 'Strategy, Welfare, Operation, Capital', 'Structure, Output, Weight, Cost', 'a', 'SWOC = Strengths, Weaknesses, Opportunities, Challenges.'),
+  ('44444444-0000-0000-0000-000000000214', 'The supreme constitutional auditing body in Nepal headed by Auditor General is:', 'Ministry of Finance', 'Office of the Auditor General (OAG)', 'Financial Comptroller General Office', 'Public Accounts Committee', 'b', 'Office of the Auditor General audits government revenues and expenditures.'),
+  ('44444444-0000-0000-0000-000000000214', 'In Nepal, public procurement by government bodies is regulated by:', 'Public Procurement Act 2063', 'Civil Service Act 2049', 'Financial Administration Rules 2056', 'Government Contract Act 2030', 'a', 'Public Procurement Act 2063 B.S. governs public procurement.'),
+  ('44444444-0000-0000-0000-000000000214', 'The classic acronym POSDCORB representing management functions was coined by:', 'Henri Fayol', 'Luther Gulick', 'Chester Barnard', 'Herbert Simon', 'b', 'Luther Gulick coined POSDCORB (Planning, Organizing, Staffing, Directing, Co-ordinating, Reporting, Budgeting).'),
+  ('44444444-0000-0000-0000-000000000214', 'An audit assessing whether resources were used economically, efficiently, and effectively (3 Es) is:', 'Financial Audit', 'Compliance Audit', 'Performance Audit', 'Internal Audit', 'c', 'Performance audit evaluates Economy, Efficiency, and Effectiveness (3 Es).'),
+  ('44444444-0000-0000-0000-000000000214', 'Local governance and decentralization in federal Nepal is currently governed by:', 'Local Self-Governance Act 2055', 'Local Government Operation Act 2074', 'District Development Act 2049', 'Provincial Administration Act 2072', 'b', 'Local Government Operation Act 2074 B.S. defines powers of 753 local levels.'),
+  ('44444444-0000-0000-0000-000000000214', 'The main tools of Fiscal Policy used by government are:', 'Interest rate and reserve ratio', 'Taxation and Public Expenditure', 'Exchange rate and import quota', 'Open market operations', 'b', 'Fiscal policy uses taxation and government spending to influence the economy.'),
+  ('44444444-0000-0000-0000-000000000214', 'Personnel Information System (PIS) in Nepal civil service is maintained by:', 'Ministry of Home Affairs', 'Department of Civil Personnel Records (Nijamati Kitabkhana)', 'Public Service Commission', 'Ministry of Finance', 'b', 'Department of Civil Personnel Records (Nijamati Kitabkhana) maintains civil service PIS records.');

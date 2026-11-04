@@ -1,0 +1,89 @@
+
+> vidyasetu@0.1.0 dev
+> next dev
+
+  ▲ Next.js 15.0.0
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.8s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 1228ms (150 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 16.9s (937 modules)
+ GET / 200 in 18733ms
+ ○ Compiling /browse ...
+ ✓ Compiled /browse in 1927ms (1002 modules)
+ GET /browse?type=past_paper 200 in 2178ms
+ GET /browse?type=mcq 200 in 713ms
+ GET /browse?type=mcq 200 in 45ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000003 200 in 33ms
+ GET /browse?type=past_paper 200 in 31ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000003 200 in 31ms
+ GET / 200 in 73ms
+ GET /browse?type=mcq 200 in 33ms
+ GET /browse?type=quiz 200 in 34ms
+ GET /browse?type=quiz 200 in 32ms
+ GET /browse?program=loksewa 200 in 30ms
+ GET /browse?program=loksewa 200 in 39ms
+ ○ Compiling /leaderboard ...
+ ✓ Compiled /leaderboard in 939ms (994 modules)
+ GET /leaderboard 200 in 1212ms
+ GET /leaderboard 200 in 28ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1017ms (1018 modules)
+ GET /login?returnUrl=%2Fcontribute 200 in 1118ms
+ GET / 200 in 106ms
+ GET /browse?type=past_paper 200 in 118ms
+ GET /browse?type=mcq 200 in 39ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000012 200 in 29ms
+ GET /browse?type=mcq 200 in 27ms
+ GET /browse?type=quiz 200 in 33ms
+ GET /browse?program=loksewa 200 in 34ms
+ GET /leaderboard 200 in 127ms
+ GET /login?returnUrl=%2Fcontribute 200 in 62ms
+ GET / 200 in 64ms
+ GET /browse?type=past_paper 200 in 34ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000008 200 in 24ms
+ ○ Compiling /subject/[id] ...
+ ✓ Compiled /subject/[id] in 1566ms (1058 modules)
+ GET /browse?type=note 200 in 169ms
+ GET /subject/33333333-0000-0000-0000-000000000007 200 in 4382ms
+ GET /subject/33333333-0000-0000-0000-000000000007 200 in 50ms
+ GET /subject/33333333-0000-0000-0000-000000000007 200 in 28ms
+ GET / 200 in 75ms
+ GET /browse?type=past_paper 200 in 2318ms
+ GET /browse?type=past_paper 200 in 31ms
+ GET /browse?type=mcq 200 in 38ms
+ GET /browse?type=quiz 200 in 30ms
+ GET /browse?type=quiz 200 in 33ms
+ GET /browse?program=loksewa 200 in 28ms
+ GET /browse?type=mcq 200 in 28ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000002 200 in 32ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000009 200 in 31ms
+ GET / 200 in 110ms
+ GET /browse?type=quiz 200 in 2456ms
+ GET /browse?type=past_paper 200 in 821ms
+ GET /browse?type=note 200 in 28ms
+ GET / 200 in 100ms
+ GET /browse?program=bachelor 200 in 3231ms
+ GET /browse?program=secondary 200 in 567ms
+ GET /browse?program=bachelor 200 in 49ms
+ GET /subject/33333333-0000-0000-0000-000000000034 200 in 1164ms
+ GET / 200 in 84ms
+ GET /browse?program=loksewa 200 in 30ms
+ GET / 200 in 37ms
+ GET /browse?type=past_paper 200 in 23ms
+ GET /browse?type=mcq 200 in 26ms
+ GET /browse?type=note 200 in 27ms
+ GET / 200 in 30ms
+ GET /browse?type=past_paper 200 in 255ms
+ GET /browse?type=mcq 200 in 237ms
+ GET /browse?type=mcq 200 in 34ms
+ GET /browse?type=mcq 200 in 38ms
+ GET /browse?type=past_paper 200 in 37ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000003 200 in 47ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000002 200 in 49ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000002 200 in 38ms
+ GET /browse?faculty=22222222-0000-0000-0000-000000000001 200 in 31ms
