@@ -11,26 +11,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/not-found.js"
     ],
-    "/(auth)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/layout.js"
-    ],
-    "/(auth)/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
-    ],
-    "/(marketing)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(marketing)/layout.js"
-    ],
-    "/(marketing)/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(marketing)/page.js"
-    ],
     "/(student)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -41,10 +21,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(student)/loading.js"
     ],
-    "/(student)/browse/page": [
+    "/(student)/leaderboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(student)/browse/page.js"
+      "static/chunks/app/(student)/leaderboard/page.js"
     ]
   }
 }
