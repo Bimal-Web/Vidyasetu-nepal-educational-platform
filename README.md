@@ -2,9 +2,9 @@
 
 **"The Bridge of Knowledge"** — A full-stack, production-grade free digital education platform for Nepali students.
 
-> **Project:** BCA Final Year Project — Tribhuvan University, Mechi Multiple Campus  
-> **Students:** Bimal Ghorsai & Dipesh Timsina  
-> **Supervisor:** Mr. Bishal Ghimire
+> **Project:** BCA  Project — Tribhuvan University, Mechi Multiple Campus  
+> **Students:** Bimal  & Dipesh T
+
 
 ---
 
