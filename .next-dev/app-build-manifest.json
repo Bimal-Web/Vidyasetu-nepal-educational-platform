@@ -11,6 +11,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/not-found.js"
     ],
+    "/(marketing)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(marketing)/layout.js"
+    ],
+    "/(marketing)/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(marketing)/page.js"
+    ],
     "/(student)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -21,10 +31,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(student)/loading.js"
     ],
-    "/(student)/leaderboard/page": [
+    "/(student)/browse/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(student)/leaderboard/page.js"
+      "static/chunks/app/(student)/browse/page.js"
     ]
   }
 }

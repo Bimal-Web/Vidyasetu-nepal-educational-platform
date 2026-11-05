@@ -15,27 +15,95 @@ export function getSubjectCoverImage(subject?: {
   const faculty = (subject.faculties_or_streams?.name || '').toLowerCase()
   const icon = (subject.icon_key || '').toLowerCase()
 
-  // 1. Health & Physical Education
+  // 1. Database Management System (DBMS, SQL, Relational)
+  if (
+    name.includes('database') ||
+    name.includes('dbms') ||
+    name.includes('sql') ||
+    name.includes('relational')
+  ) {
+    return '/assets/subjects/database-management.jpg'
+  }
+
+  // 2. Data Structures & Algorithms (DSA, Trees, Graphs, Sorting)
+  if (
+    name.includes('data structure') ||
+    name.includes('algorithm') ||
+    name.includes('dsa')
+  ) {
+    return '/assets/subjects/data-structures.jpg'
+  }
+
+  // 3. Web Technology & Development (HTML, CSS, JS, Web Tech)
+  if (
+    name.includes('web tech') ||
+    name.includes('web development') ||
+    name.includes('frontend') ||
+    name.includes('backend') ||
+    name.includes('full stack') ||
+    name.includes('internet')
+  ) {
+    return '/assets/subjects/web-technology.jpg'
+  }
+
+  // 4. Object Oriented Programming in Java
+  if (
+    name.includes('java') ||
+    (name.includes('object oriented') && !name.includes('c++'))
+  ) {
+    return '/assets/subjects/java-programming.jpg'
+  }
+
+  // 5. C Programming / Structured Programming
+  if (
+    name === 'c programming' ||
+    name.includes('programming in c') ||
+    name.includes('structured programming')
+  ) {
+    return '/assets/subjects/c-programming.jpg'
+  }
+
+  // 6. Discrete Mathematics & Logic
+  if (
+    name.includes('discrete math') ||
+    name.includes('discrete structure')
+  ) {
+    return '/assets/subjects/discrete-mathematics.jpg'
+  }
+
+  // 7. Economics, Banking, Finance, Commercial Law
+  if (
+    name.includes('economic') ||
+    name.includes('banking') ||
+    name.includes('finance') ||
+    name.includes('accounting') ||
+    name.includes('business math') ||
+    name.includes('financial')
+  ) {
+    return '/assets/subjects/economics-finance.jpg'
+  }
+
+  // 8. Health & Physical Education
   if (name.includes('health') || name.includes('physical') || name.includes('sports') || icon === 'heart') {
     return '/assets/subjects/health-physical-edu.jpg'
   }
 
-  // 2. Moral Education & Ethics
+  // 9. Moral Education & Ethics
   if (name.includes('moral') || name.includes('ethics') || name.includes('character') || name.includes('values')) {
     return '/assets/subjects/moral-education.jpg'
   }
 
-  // 3. Social Studies, Geography, History, Civics
+  // 10. Social Studies, Geography, History, Civics
   if (name.includes('social') || name.includes('geography') || name.includes('history') || name.includes('samajik') || icon === 'globe') {
     return '/assets/subjects/social-studies.jpg'
   }
 
-  // 4. Vocational & Technical Education
+  // 11. Vocational & Technical Education
   if (name.includes('vocational') || name.includes('technical') || name.includes('trade') || name.includes('workshop') || icon === 'wrench') {
     return '/assets/subjects/vocational-technical.jpg'
   }
 
-  // 5. Mathematics & Statistics
+  // 12. General Mathematics & Statistics
   if (
     name.includes('math') ||
     name.includes('algebra') ||
@@ -49,7 +117,7 @@ export function getSubjectCoverImage(subject?: {
     return '/assets/subjects/mathematics.jpg'
   }
 
-  // 6. Computer Science, Software Engineering & IT
+  // 13. General Computer Science & Fundamentals
   if (
     name.includes('computer') ||
     name.includes('programming') ||
@@ -64,7 +132,7 @@ export function getSubjectCoverImage(subject?: {
     return '/assets/subjects/computer-science.jpg'
   }
 
-  // 7. Physics, Chemistry, Science
+  // 14. Physics, Chemistry, General Science
   if (
     name.includes('physics') ||
     name.includes('science') ||
@@ -79,7 +147,7 @@ export function getSubjectCoverImage(subject?: {
     return '/assets/subjects/physics-science.jpg'
   }
 
-  // 8. Loksewa & Public Administration
+  // 15. Loksewa & Public Administration
   if (
     name.includes('loksewa') ||
     name.includes('officer') ||
@@ -91,15 +159,16 @@ export function getSubjectCoverImage(subject?: {
     return '/assets/subjects/social-studies.jpg'
   }
 
-  // 9. Literature & Language Arts
+  // 16. Literature & Language Arts
   if (name.includes('nepali') || name.includes('english') || name.includes('literature') || icon === 'book' || icon === 'languages') {
     return '/assets/subjects/moral-education.jpg'
   }
 
-  // 10. Medical & Biology
+  // 17. Medical & Biology
   if (name.includes('biology') || name.includes('medical') || name.includes('zoology') || name.includes('botany') || icon === 'biology') {
     return '/assets/subjects/health-physical-edu.jpg'
   }
 
   return '/assets/subjects/physics-science.jpg'
 }
+
