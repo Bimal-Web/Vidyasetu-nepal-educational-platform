@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Mail, ArrowLeft, CheckCircle2, KeyRound, Sparkles } from 'lucide-react'
+import { Mail, ArrowLeft, CheckCircle2, KeyRound } from 'lucide-react'
+import { Logo } from '@/components/layout/Logo'
 
 export default function ForgotPasswordPage() {
   const supabase = createClient()
@@ -47,9 +48,7 @@ export default function ForgotPasswordPage() {
             <ArrowLeft size={14} />
             <span>Back to Login</span>
           </Link>
-          <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400">
-            <span>VidyaSetu</span>
-          </Link>
+          <Logo size="sm" />
         </div>
 
         <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-8 sm:p-10 shadow-xl shadow-slate-900/5 dark:shadow-black/40">

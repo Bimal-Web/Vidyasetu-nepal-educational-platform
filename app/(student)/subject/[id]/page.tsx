@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { SubjectBadge } from '@/components/features/SubjectBadge'
+import { getSubjectCoverImage } from '@/lib/subject-covers'
 import { SubjectTabs } from './SubjectTabs'
 import { SubjectBookmark } from './SubjectBookmark'
 import { Star, Users, BookOpen, ChevronRight, Sparkles, FileText, CheckCircle2, Brain } from 'lucide-react'
@@ -113,6 +115,20 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
         <ChevronRight size={14} className="text-slate-400" />
         <span className="text-slate-900 dark:text-white font-semibold truncate">{subject.name}</span>
       </nav>
+
+      {/* Subject Cover Hero Banner */}
+      <div className="relative h-44 sm:h-52 w-full rounded-2xl overflow-hidden mb-6 shadow-md border border-slate-200/80 dark:border-slate-800 bg-slate-900">
+        <Image
+          src={getSubjectCoverImage(subject)}
+          alt={subject.name}
+          fill
+          className="object-cover"
+          referrerPolicy="no-referrer"
+          priority
+          sizes="(max-width: 1280px) 100vw, 1200px"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
+      </div>
 
       {/* Main Subject Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-6">

@@ -10,6 +10,7 @@ export interface BlogPost {
   author: string
   authorRole: string
   authorAvatar?: string
+  image?: string
   tags: string[]
   featured?: boolean
 }
@@ -35,6 +36,7 @@ export const blogPosts: BlogPost[] = [
     date: 'August 15, 2025',
     author: 'Bimal Ghorsai',
     authorRole: 'VidyaSetu Co-founder',
+    image: '/assets/blog/see-student-dhakatopi.jpg',
     tags: ['SEE', 'Exam Tips', 'Secondary School', 'Nepal Education'],
     featured: true,
     content: `
@@ -112,6 +114,7 @@ With consistent effort, the right resources from VidyaSetu, and a clear strategy
     date: 'August 10, 2025',
     author: 'Dipesh Timsina',
     authorRole: 'VidyaSetu Co-founder',
+    image: '/assets/blog/loksewa-dhakatopi.jpg',
     tags: ['Loksewa', 'PSC', 'Civil Service', 'Government Jobs Nepal'],
     featured: true,
     content: `
@@ -203,6 +206,7 @@ Start your Loksewa journey today — the seat is waiting for the most prepared c
     date: 'August 5, 2025',
     author: 'Bimal Ghorsai',
     authorRole: 'VidyaSetu Co-founder',
+    image: '/assets/blog/study-techniques-dhakatopi.jpg',
     tags: ['Study Tips', 'Learning', 'Memory', 'Productivity'],
     content: `
 ## Why Most Students Study the Wrong Way

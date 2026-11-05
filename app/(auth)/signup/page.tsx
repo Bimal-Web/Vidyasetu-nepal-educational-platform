@@ -10,6 +10,7 @@ import {
   ArrowLeft, CheckCircle2, ShieldCheck, BookOpen, Trophy, 
   Users, Star, Sun, Moon, GraduationCap, Award, Laptop, FileText, Check
 } from 'lucide-react'
+import { Logo } from '@/components/layout/Logo'
 
 function GoogleLogo() {
   return (
@@ -205,18 +206,7 @@ export default function SignupPage() {
 
         <div className="login-left-content">
           {/* Brand header */}
-          <Link href="/" className="login-brand group" id="signup-brand-link">
-            <div className="login-brand-mark group-hover:scale-105 transition-transform">
-              <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
-                <path d="M3 4L8 14L13 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 4h3M17 4v10M17 14h-3" stroke="#fbbf24" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <span className="login-brand-name">VidyaSetu</span>
-            <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-white/10 text-indigo-200 border border-white/10 ml-2">
-              Nepal
-            </span>
-          </Link>
+          <Logo variant="white" size="lg" className="login-brand group" id="signup-brand-link" badge="Nepal" />
 
           {/* Headline */}
           <div className="login-left-headline">
@@ -293,10 +283,12 @@ export default function SignupPage() {
               onClick={toggleTheme}
               type="button"
               className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title="Toggle theme"
               aria-label="Toggle theme"
+              suppressHydrationWarning
             >
-              {dark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
+              <Moon size={15} className="dark:hidden" />
+              <Sun size={15} className="text-amber-400 hidden dark:block" />
             </button>
           </div>
 

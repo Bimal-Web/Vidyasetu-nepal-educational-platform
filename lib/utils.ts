@@ -13,12 +13,16 @@ export function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const
+
 export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
+  try {
+    const d = new Date(dateString)
+    if (isNaN(d.getTime())) return dateString
+    return `${SHORT_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`
+  } catch {
+    return dateString
+  }
 }
 
 export function formatTimeSeconds(seconds: number): string {

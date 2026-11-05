@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Clock, ArrowRight, BookOpen, Flame, TrendingUp, Users, Star } from 'lucide-react'
 import { blogPosts, categoryColorMap, AUTHOR_AVATARS, AUTHOR_POSITIONS } from './blogData'
 import type { Metadata } from 'next'
@@ -80,6 +81,19 @@ export default function BlogPage() {
                 >
                   {/* Top accent stripe */}
                   <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)' }} />
+
+                  {post.image && (
+                    <div className="relative h-48 w-full overflow-hidden bg-slate-900">
+                      <Image
+                        src={post.image}
+                        alt={post.title}
+                        fill
+                        className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent pointer-events-none" />
+                    </div>
+                  )}
 
                   <div className="p-7 flex flex-col gap-4 flex-1">
                     <div className="flex items-start justify-between gap-3">

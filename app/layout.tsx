@@ -26,12 +26,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning className="overflow-x-clip">
-      <body className={`${inter.className} overflow-x-clip min-h-screen`} suppressHydrationWarning>
+      <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('vs-dark');var d=t==='true'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})();`,
+            __html: `try{var t=localStorage.getItem('vs-dark');var d=t==='true'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}`,
           }}
         />
+      </head>
+      <body className={`${inter.className} overflow-x-clip min-h-screen`} suppressHydrationWarning>
         {children}
       </body>
     </html>

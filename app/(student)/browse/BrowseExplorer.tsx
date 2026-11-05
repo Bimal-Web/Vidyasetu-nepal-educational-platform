@@ -2,12 +2,14 @@
 
 import { useState, useMemo, useEffect, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { SubjectBadge } from '@/components/features/SubjectBadge'
+import { getSubjectCoverImage } from '@/lib/subject-covers'
 import type { Subject, FacultyOrStream, Program } from '@/types'
 import {
   Search, X, LayoutGrid, List, ArrowUpDown, Bookmark,
-  ArrowRight, FileText, BookOpen, Clock, Brain, Sparkles, Filter
+  ArrowRight, FileText, BookOpen, Brain, Sparkles, Filter
 } from 'lucide-react'
 
 interface BrowseExplorerProps {
@@ -36,7 +38,6 @@ export function BrowseExplorer({
   currentProgram = '',
 }: BrowseExplorerProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [, startTransition] = useTransition()
 
   // Local state for instant client-side reactivity
@@ -382,50 +383,65 @@ export function BrowseExplorer({
             const quizCount = counts[subject.id]?.quizzes ?? 0
             const faculty = faculties.find(f => f.id === subject.faculty_id)
 
+            const coverImage = getSubjectCoverImage(subject)
+
             return (
               <div
                 key={subject.id}
-                className="double-bezel group p-1.5 flex flex-col"
+                className="double-bezel group p-1 flex flex-col"
               >
-                <div className="double-bezel-inner h-full flex flex-col justify-between gap-5 p-5 sm:p-6 relative overflow-hidden">
-                  {/* Subtle top ambient color line */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 opacity-40 group-hover:opacity-100 transition-opacity" />
-
+                <div className="double-bezel-inner h-full flex flex-col justify-between relative overflow-hidden rounded-[22px]">
                   <div>
-                    {/* Header: Badge & Bookmark */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="transition-transform group-hover:scale-105 duration-300">
+                    {/* ── Subject Cover Image Header ── */}
+                    <div className="relative h-36 sm:h-40 w-full overflow-hidden bg-slate-900">
+                      <Image
+                        src={coverImage}
+                        alt={subject.name}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                      {/* Contrast gradient vignette */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-black/20 pointer-events-none" />
+
+                      {/* Floating Subject Badge icon on bottom-left of cover */}
+                      <div className="absolute bottom-3 left-3.5 transition-transform group-hover:scale-105 duration-300 drop-shadow-md">
                         <SubjectBadge iconKey={subject.icon_key} colorKey={subject.color_key} size="md" />
                       </div>
-                      <button
-                        onClick={e => toggleBookmark(subject.id, e)}
-                        className={`p-2 rounded-xl transition-all duration-200 active:scale-125 ${
-                          isBookmarked
-                            ? 'text-red-500 bg-red-50 dark:bg-red-950/50 shadow-xs'
-                            : 'text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-                        }`}
-                        aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark subject'}
-                        title={isBookmarked ? 'Bookmarked' : 'Add to bookmarks'}
-                      >
-                        <Bookmark size={16} fill={isBookmarked ? 'currentColor' : 'none'} />
-                      </button>
+
+                      {/* Bookmark button on top-right of cover */}
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={e => toggleBookmark(subject.id, e)}
+                          className={`p-2 rounded-xl backdrop-blur-md transition-all duration-200 active:scale-125 ${
+                            isBookmarked
+                              ? 'text-red-400 bg-red-950/70 border border-red-500/40 shadow-xs'
+                              : 'text-white/90 hover:text-white bg-black/40 hover:bg-black/60 border border-white/15'
+                          }`}
+                          aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark subject'}
+                          title={isBookmarked ? 'Bookmarked' : 'Add to bookmarks'}
+                        >
+                          <Bookmark size={15} fill={isBookmarked ? 'currentColor' : 'none'} />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Subject Details */}
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    {/* Subject Details (padded) */}
+                    <div className="p-4 sm:p-5 pb-2">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-2">
                         {faculty && (
                           <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
                             {faculty.name}
                           </span>
                         )}
-                        {subject.grade_or_semester && (
+                        {subject.grade_or_semester && subject.grade_or_semester !== faculty?.name && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/50">
                             {subject.grade_or_semester}
                           </span>
                         )}
                       </div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
                         {subject.name}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">
@@ -434,9 +450,10 @@ export function BrowseExplorer({
                     </div>
                   </div>
 
-                  <div>
+                  {/* Material Pills & Action Button (padded) */}
+                  <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                     {/* Direct Jump Material Pills */}
-                    <div className="flex flex-wrap gap-2 text-xs mb-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                    <div className="flex flex-wrap gap-2 text-xs mb-3.5 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                       <Link
                         href={`/subject/${subject.id}?tab=notes`}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50/80 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold transition-all border border-indigo-200/50 dark:border-indigo-800/50"
@@ -520,7 +537,7 @@ export function BrowseExplorer({
                             {faculty.name}
                           </span>
                         )}
-                        {subject.grade_or_semester && (
+                        {subject.grade_or_semester && subject.grade_or_semester !== faculty?.name && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 whitespace-nowrap">
                             {subject.grade_or_semester}
                           </span>

@@ -37,7 +37,7 @@ function Counter({ end, suffix }: { end: number; suffix: string }) {
   }, [end])
 
   const formatted = count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(count)
-  return <span ref={ref}>{formatted}{suffix}</span>
+  return <span ref={ref} suppressHydrationWarning>{formatted}{suffix}</span>
 }
 
 export function HomeStats({ resources, learners, subjects }: HomeStatsProps) {

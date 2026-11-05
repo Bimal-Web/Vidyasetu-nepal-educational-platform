@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, Clock, Calendar, User, Tag, ArrowRight, BookOpen, Share2 } from 'lucide-react'
 import { getBlogPost, blogPosts, categoryColorMap, AUTHOR_AVATARS, AUTHOR_POSITIONS } from '../blogData'
 import type { Metadata } from 'next'
@@ -194,6 +195,20 @@ export default async function BlogPostPage({ params }: Props) {
                 <p className="text-xs text-slate-400">{post.authorRole}</p>
               </div>
             </div>
+
+            {/* Featured Image */}
+            {post.image && (
+              <div className="relative w-full h-64 sm:h-80 md:h-96 rounded-2xl overflow-hidden mb-8 shadow-lg border border-slate-200/80 dark:border-slate-800">
+                <Image
+                  src={post.image}
+                  alt={post.title}
+                  fill
+                  className="object-cover"
+                  referrerPolicy="no-referrer"
+                  priority
+                />
+              </div>
+            )}
 
             {/* Article body */}
             <div

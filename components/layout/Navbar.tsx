@@ -462,12 +462,13 @@ export function Navbar() {
               <button
                 onClick={toggleDark}
                 className="w-9 h-9 rounded-full text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors flex items-center justify-center border border-slate-200/80 dark:border-slate-800/80"
-                aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-                aria-pressed={dark}
+                aria-label="Toggle theme"
                 id="navbar-dark-toggle"
-                title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+                title="Toggle theme"
+                suppressHydrationWarning
               >
-                {dark ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
+                <Moon size={16} className="dark:hidden" />
+                <Sun size={16} className="text-amber-400 hidden dark:block" />
               </button>
 
               {user ? (
@@ -711,9 +712,13 @@ export function Navbar() {
               <button
                 onClick={toggleDark}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                aria-label="Toggle theme"
+                suppressHydrationWarning
               >
-                {dark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
-                <span>{dark ? 'Light Mode' : 'Dark Mode'}</span>
+                <Moon size={15} className="dark:hidden" />
+                <Sun size={15} className="text-amber-400 hidden dark:block" />
+                <span className="dark:hidden">Dark Mode</span>
+                <span className="hidden dark:inline">Light Mode</span>
               </button>
             </div>
           </div>

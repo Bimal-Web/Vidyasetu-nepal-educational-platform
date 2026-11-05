@@ -3,6 +3,7 @@ import { LandingHero } from './LandingHero'
 import { HomeStats } from './HomeStats'
 import { SubjectBadge } from '@/components/features/SubjectBadge'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowRight, WifiOff, Users, TrendingUp, ShieldCheck,
   Map, BookOpen, Award, Star, Quote, Zap, Sparkles,
@@ -467,6 +468,8 @@ export default async function HomePage() {
               slug: 'how-to-crack-see-exam-nepal',
               num: '01',
               gradientClass: 'blog-gradient-1',
+              image: '/assets/blog/see-student-dhakatopi.jpg',
+              imageAlt: 'Single Nepali student wearing traditional Dhaka topi studying with books for SEE exam',
               icon: BookOpen,
               title: 'How to Crack the SEE Exam: A Complete Strategy Guide',
               category: 'Exam Strategy',
@@ -477,6 +480,8 @@ export default async function HomePage() {
               slug: 'loksewa-preparation-guide-nepal',
               num: '02',
               gradientClass: 'blog-gradient-2',
+              image: '/assets/blog/loksewa-dhakatopi.jpg',
+              imageAlt: 'Single Nepali aspirant wearing Dhaka topi preparing for Loksewa civil service examination',
               icon: Award,
               title: 'The Ultimate Loksewa Preparation Guide: Beginner to Officer',
               category: 'Loksewa',
@@ -487,6 +492,8 @@ export default async function HomePage() {
               slug: 'best-study-techniques-nepali-students',
               num: '03',
               gradientClass: 'blog-gradient-3',
+              image: '/assets/blog/study-techniques-dhakatopi.jpg',
+              imageAlt: 'Focused Nepali student wearing Dhaka topi studying with notes and textbooks',
               icon: Zap,
               title: '7 Science-Backed Study Techniques Every Student Should Use',
               category: 'Study Tips',
@@ -502,11 +509,22 @@ export default async function HomePage() {
                 className="blog-card-enhanced group"
                 id={`blog-${post.slug}`}
               >
-                {/* Visual Gradient Header */}
-                <div className={`blog-card-gradient ${post.gradientClass}`}>
-                  <div className="blog-card-gradient-number">{post.num}</div>
-                  <div className="blog-card-gradient-icon">
-                    <PostIcon size={20} />
+                {/* Visual Header with AI generated photo of Nepali student in Dhaka topi */}
+                <div className="relative h-44 w-full overflow-hidden bg-slate-900">
+                  <Image
+                    src={post.image}
+                    alt={post.imageAlt}
+                    fill
+                    className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                    referrerPolicy="no-referrer"
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                  />
+                  {/* Subtle dark gradient overlay to keep badge and icon crystal clear */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none" />
+
+                  <div className="blog-card-gradient-number shadow-md">{post.num}</div>
+                  <div className="blog-card-gradient-icon shadow-md">
+                    <PostIcon size={18} />
                   </div>
                 </div>
 

@@ -54,7 +54,7 @@ function AnimatedCounter({ value, suffix = '+' }: { value: number; suffix?: stri
   }, [value])
 
   const formatted = count >= 1000 ? `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(count)
-  return <span ref={ref}>{formatted}{suffix}</span>
+  return <span ref={ref} suppressHydrationWarning>{formatted}{suffix}</span>
 }
 
 /** Animated donut ring with high-contrast indicator */

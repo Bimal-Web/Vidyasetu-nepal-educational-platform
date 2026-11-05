@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isDemoMode } from '@/lib/supabase/demo-db'
 import { Mail, Lock, Eye, EyeOff, Sparkles, ArrowRight, BookOpen, Trophy, Users, Star } from 'lucide-react'
+import { Logo } from '@/components/layout/Logo'
 
 const DEMO_ACCOUNTS = [
   { label: 'Student', email: 'student@vidyasetu.com', desc: 'Dashboard, quizzes & bookmarks', color: '#6366f1' },
@@ -124,15 +125,7 @@ function LoginForm() {
 
         <div className="login-left-content">
           {/* Brand */}
-          <Link href="/" className="login-brand">
-            <div className="login-brand-mark">
-              <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
-                <path d="M3 4L8 14L13 4" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14 4h3M17 4v10M17 14h-3" stroke="#fbbf24" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <span className="login-brand-name">VidyaSetu</span>
-          </Link>
+          <Logo variant="white" size="lg" className="login-brand" id="login-brand-link" />
 
           {/* Headline */}
           <div className="login-left-headline">
@@ -210,7 +203,6 @@ function LoginForm() {
                     disabled={loading}
                     title={acc.desc}
                     className="login-demo-btn"
-                    style={{ '--accent': acc.color } as React.CSSProperties}
                   >
                     <span className="login-demo-label">{acc.label}</span>
                     <span className="login-demo-email">{acc.email}</span>

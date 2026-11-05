@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const TEAM = [
   {
     name: 'Bimal Ghorsai',
-    role: 'Full-Stack Developer',
+    role: 'Security & Frontend Dev',
     initials: 'BG',
     color: '#3730a3',
     image: '/assets/aistudio/image_2439f431.png',
