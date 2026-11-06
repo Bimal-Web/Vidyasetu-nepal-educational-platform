@@ -136,29 +136,52 @@ export default function SignupPage() {
     }
   }
 
+  // Safety timeout: reset loading if redirection takes more than 7 seconds
+  useEffect(() => {
+    if (!googleLoading) return
+    const timer = setTimeout(() => {
+      setGoogleLoading(false)
+    }, 7000)
+    return () => clearTimeout(timer)
+  }, [googleLoading])
+
   const handleGoogle = async () => {
     if (googleLoading) return
     setGoogleLoading(true)
     setError(null)
     try {
-      const { error: err } = await supabase.auth.signInWithOAuth({
+      if (isDemoMode()) {
+        const { error: err } = await supabase.auth.signInWithOAuth({ provider: 'google' })
+        if (err) throw err
+        window.location.href = '/dashboard'
+        return
+      }
+
+      const callbackUrl = `${window.location.origin}/api/auth/callback`
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+        options: { redirectTo: callbackUrl },
       })
+
       if (err) {
-        const msg = err.message.toLowerCase().includes('provider')
-          ? 'Google sign-in is not yet enabled. Please create an account with email & password below.'
+        const isProviderDisabled = err.message.toLowerCase().includes('provider')
+        const msg = isProviderDisabled
+          ? 'Google sign-in is not yet enabled in your Supabase project. Enable it in Supabase Dashboard → Authentication → Providers → Google, or create an account with email below.'
           : err.message
         setError(msg)
         setGoogleLoading(false)
         return
       }
-      if (isDemoMode()) {
-        router.push('/dashboard')
-        router.refresh()
+
+      if (data?.url) {
+        window.location.href = data.url
+        return
       }
-    } catch {
-      setError('Google sign-in is not yet configured. Please use email & password.')
+
+      window.location.href = '/dashboard'
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google sign-in could not be completed. Please try again or use email.'
+      setError(msg)
       setGoogleLoading(false)
     }
   }
@@ -318,6 +341,7 @@ export default function SignupPage() {
             disabled={googleLoading || loading}
             type="button"
             className="login-google-btn group"
+            suppressHydrationWarning
           >
             <GoogleLogo />
             <span>{googleLoading ? 'Connecting to Google…' : 'Continue with Google'}</span>
@@ -352,6 +376,7 @@ export default function SignupPage() {
                   autoComplete="name" 
                   placeholder="e.g. Bimal Ghorsai" 
                   className="login-input" 
+                  suppressHydrationWarning
                 />
               </div>
             </div>
@@ -372,6 +397,7 @@ export default function SignupPage() {
                   autoComplete="email" 
                   placeholder="you@example.com" 
                   className="login-input" 
+                  suppressHydrationWarning
                 />
               </div>
             </div>
@@ -395,6 +421,7 @@ export default function SignupPage() {
                           ? 'bg-indigo-50 dark:bg-indigo-950/70 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-2xs'
                           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                       }`}
+                      suppressHydrationWarning
                     >
                       <Icon size={14} className={active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'} />
                       <span className="truncate">{stream.label}</span>
@@ -423,6 +450,7 @@ export default function SignupPage() {
                   autoComplete="new-password" 
                   placeholder="Create a secure password" 
                   className="login-input login-input-pass" 
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"
@@ -430,6 +458,7 @@ export default function SignupPage() {
                   className="login-eye-btn"
                   title={showPass ? 'Hide password' : 'Show password'}
                   aria-label={showPass ? 'Hide password' : 'Show password'}
+                  suppressHydrationWarning
                 >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -461,6 +490,7 @@ export default function SignupPage() {
               type="submit"
               disabled={loading || googleLoading}
               className="login-submit-btn group mt-2"
+              suppressHydrationWarning
             >
               {loading ? (
                 <div className="flex items-center gap-2">

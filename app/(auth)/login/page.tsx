@@ -79,29 +79,55 @@ function LoginForm() {
     router.refresh()
   }
 
+  // Safety timeout: reset loading if redirection takes more than 7 seconds
+  useEffect(() => {
+    if (!googleLoading) return
+    const timer = setTimeout(() => {
+      setGoogleLoading(false)
+    }, 7000)
+    return () => clearTimeout(timer)
+  }, [googleLoading])
+
   const handleGoogle = async () => {
     if (googleLoading) return
     setGoogleLoading(true)
     setError(null)
     try {
-      const { error: err } = await supabase.auth.signInWithOAuth({
+      if (isDemoMode()) {
+        const { error: err } = await supabase.auth.signInWithOAuth({ provider: 'google' })
+        if (err) throw err
+        // In demo mode, immediately navigate to the target page with session cookie set
+        window.location.href = returnUrl
+        return
+      }
+
+      // Live Supabase OAuth
+      const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent(returnUrl)}`
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/api/auth/callback?returnUrl=${returnUrl}` },
+        options: { redirectTo: callbackUrl },
       })
+
       if (err) {
-        const msg = err.message.toLowerCase().includes('provider')
-          ? 'Google sign-in is not yet enabled. Please use email & password.'
+        const isProviderDisabled = err.message.toLowerCase().includes('provider')
+        const msg = isProviderDisabled
+          ? 'Google sign-in is not yet enabled in your Supabase project. Enable it in Supabase Dashboard → Authentication → Providers → Google, or sign in using email & password.'
           : err.message
         setError(msg)
         setGoogleLoading(false)
         return
       }
-      if (isDemoMode()) {
-        router.push(returnUrl)
-        router.refresh()
+
+      if (data?.url) {
+        // Navigate browser to Google OAuth consent screen
+        window.location.href = data.url
+        return
       }
-    } catch {
-      setError('Google sign-in is not yet configured. Please use email & password.')
+
+      window.location.href = returnUrl
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google sign-in could not be completed. Please try again or use email.'
+      setError(msg)
       setGoogleLoading(false)
     }
   }
@@ -203,6 +229,7 @@ function LoginForm() {
                     disabled={loading}
                     title={acc.desc}
                     className="login-demo-btn"
+                    suppressHydrationWarning
                   >
                     <span className="login-demo-label">{acc.label}</span>
                     <span className="login-demo-email">{acc.email}</span>
@@ -218,6 +245,7 @@ function LoginForm() {
             onClick={handleGoogle}
             disabled={googleLoading || loading}
             className="login-google-btn"
+            suppressHydrationWarning
           >
             <span className="login-google-logo">
               <GoogleLogo />
@@ -249,6 +277,7 @@ function LoginForm() {
                   autoComplete="email"
                   placeholder="you@example.com"
                   className="login-input"
+                  suppressHydrationWarning
                 />
               </div>
             </div>
@@ -270,6 +299,7 @@ function LoginForm() {
                   autoComplete="current-password"
                   placeholder="••••••••"
                   className="login-input login-input-pass"
+                  suppressHydrationWarning
                 />
                 <button
                   type="button"
@@ -277,6 +307,7 @@ function LoginForm() {
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                   aria-pressed={showPass}
                   className="login-eye-btn"
+                  suppressHydrationWarning
                 >
                   {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
@@ -289,6 +320,7 @@ function LoginForm() {
               type="submit"
               disabled={loading}
               className="login-submit-btn"
+              suppressHydrationWarning
             >
               {loading ? (
                 <>

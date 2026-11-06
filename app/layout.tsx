@@ -25,11 +25,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className="overflow-x-clip">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('vs-dark');var d=t==='true'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}`,
+            __html: `try{var t=localStorage.getItem('vs-dark');var d=t==='true'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d){document.documentElement.classList.add('dark')}else{document.documentElement.classList.remove('dark')}}catch(e){}
+try{var clean=function(){var els=document.querySelectorAll('[fdprocessedid]');for(var i=0;i<els.length;i++){els[i].removeAttribute('fdprocessedid')}};clean();if(typeof MutationObserver!=='undefined'){new MutationObserver(clean).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['fdprocessedid']})}}catch(e){}`,
           }}
         />
       </head>

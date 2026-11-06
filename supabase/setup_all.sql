@@ -185,30 +185,62 @@ alter table public.discussion_posts         enable row level security;
 alter table public.discussion_replies       enable row level security;
 alter table public.newsletter_subscribers   enable row level security;
 
+-- Helper function to check if current user is admin without triggering RLS recursion
+create or replace function public.is_admin()
+returns boolean as $$
+  select exists (
+    select 1 from public.users where id = auth.uid() and role = 'admin'
+  );
+$$ language sql security definer;
+
+-- Auto-sync auth.users -> public.users on signup
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.users (id, email, full_name, auth_provider, role)
+  values (
+    new.id,
+    coalesce(new.email, ''),
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1), 'Student'),
+    coalesce(new.raw_app_meta_data->>'provider', 'email'),
+    'student'
+  )
+  on conflict (id) do update set
+    email = excluded.email,
+    full_name = case when public.users.full_name = '' then excluded.full_name else public.users.full_name end;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
 create policy "public_read_programs"    on public.programs            for select using (true);
 create policy "public_read_faculties"   on public.faculties_or_streams for select using (true);
 create policy "public_read_subjects"    on public.subjects             for select using (true);
 
-create policy "users_own_read"   on public.users for select using (auth.uid() = id);
-create policy "users_own_update" on public.users for update using (auth.uid() = id);
-create policy "users_insert"     on public.users for insert with check (auth.uid() = id);
-create policy "users_own_delete" on public.users for delete using (auth.uid() = id);
-create policy "admin_read_users" on public.users for select using (
-  exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
-);
+-- Users policies (public read so uploader names and discussion authors display, safe mutations)
+create policy "users_public_read" on public.users for select using (true);
+create policy "users_own_update"  on public.users for update using (auth.uid() = id or public.is_admin());
+create policy "users_insert"      on public.users for insert with check (auth.uid() = id or auth.uid() is not null);
+create policy "users_own_delete"  on public.users for delete using (auth.uid() = id or public.is_admin());
 
 create policy "content_public_read"  on public.content for select using (status = 'approved');
 create policy "content_own_read"     on public.content for select using (uploaded_by = auth.uid());
 create policy "content_insert"       on public.content for insert with check (uploaded_by = auth.uid());
 create policy "content_own_delete"   on public.content for delete using (uploaded_by = auth.uid());
-create policy "admin_content_all"    on public.content for all using (
-  exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
-);
+create policy "admin_content_all"    on public.content for all using (public.is_admin());
 
 create policy "quizzes_public_read"   on public.quizzes   for select using (true);
 create policy "questions_public_read" on public.questions  for select using (true);
 
-create policy "results_own_all" on public.results for all using (user_id = auth.uid());
+-- Results policies (allow inserting quiz attempts and viewing)
+create policy "results_select_policy" on public.results for select using (auth.uid() = user_id or auth.uid() is not null);
+create policy "results_insert_policy" on public.results for insert with check (true);
+create policy "results_delete_policy" on public.results for delete using (auth.uid() = user_id or public.is_admin());
+
 create policy "bookmarks_own_all" on public.bookmarks for all using (user_id = auth.uid());
 
 create policy "downloads_own_insert" on public.downloads_log for insert with check (user_id = auth.uid());
@@ -216,9 +248,7 @@ create policy "downloads_own_read"   on public.downloads_log for select using (u
 create policy "downloads_own_delete" on public.downloads_log for delete using (user_id = auth.uid());
 
 create policy "submissions_own_all" on public.submissions for all using (contributor_id = auth.uid());
-create policy "admin_submissions_all" on public.submissions for all using (
-  exists (select 1 from public.users u where u.id = auth.uid() and u.role = 'admin')
-);
+create policy "admin_submissions_all" on public.submissions for all using (public.is_admin());
 
 create policy "discussion_posts_public_read"  on public.discussion_posts for select using (true);
 create policy "discussion_posts_insert"       on public.discussion_posts for insert with check (auth.uid() = user_id);
@@ -231,6 +261,31 @@ create policy "discussion_replies_own_update"  on public.discussion_replies for 
 create policy "discussion_replies_own_delete"  on public.discussion_replies for delete using (auth.uid() = user_id);
 
 create policy "newsletter_public_insert" on public.newsletter_subscribers for insert with check (true);
+
+-- Storage bucket configuration for uploads
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('content-uploads', 'content-uploads', true, 52428800)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Public Read Access content-uploads" on storage.objects;
+create policy "Public Read Access content-uploads"
+  on storage.objects for select
+  using (bucket_id = 'content-uploads');
+
+drop policy if exists "Auth Upload Access content-uploads" on storage.objects;
+create policy "Auth Upload Access content-uploads"
+  on storage.objects for insert
+  with check (bucket_id = 'content-uploads');
+
+drop policy if exists "Owner Update content-uploads" on storage.objects;
+create policy "Owner Update content-uploads"
+  on storage.objects for update
+  using (bucket_id = 'content-uploads' and auth.uid() = owner);
+
+drop policy if exists "Owner Delete content-uploads" on storage.objects;
+create policy "Owner Delete content-uploads"
+  on storage.objects for delete
+  using (bucket_id = 'content-uploads' and auth.uid() = owner);
 
 -- ============================================================
 -- SEED DATA

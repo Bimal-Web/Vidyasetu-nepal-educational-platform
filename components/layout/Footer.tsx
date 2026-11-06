@@ -187,8 +187,8 @@ export function Footer() {
 
         {/* Bottom attribution & legal */}
         <div className="mt-12 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p className="flex items-center gap-1" suppressHydrationWarning>
-            © {new Date().getFullYear()} VidyaSetu. Built with <Heart size={12} className="text-rose-500 fill-rose-500" /> for Nepali students.
+          <p className="flex items-center gap-1">
+            © 2026 VidyaSetu. Built with <Heart size={12} className="text-rose-500 fill-rose-500" /> for Nepali students.
           </p>
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-slate-400 font-medium">BCA Final Year Project · Tribhuvan University</span>

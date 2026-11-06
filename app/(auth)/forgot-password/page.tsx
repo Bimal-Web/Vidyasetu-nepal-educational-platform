@@ -113,6 +113,7 @@ export default function ForgotPasswordPage() {
                       placeholder="you@example.com"
                       className="login-input"
                       autoFocus
+                      suppressHydrationWarning
                     />
                   </div>
                 </div>
@@ -122,6 +123,7 @@ export default function ForgotPasswordPage() {
                   type="submit"
                   disabled={loading}
                   className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white shadow-md shadow-indigo-600/25 transition-all cursor-pointer mt-2 disabled:opacity-50"
+                  suppressHydrationWarning
                 >
                   {loading ? 'Sending link…' : 'Send Reset Link'}
                 </button>

@@ -72,7 +72,13 @@ async function getData(searchParams: Awaited<BrowsePageProps['searchParams']>) {
     }
     if (searchParams.program) {
       const programName = PROGRAM_SLUGS[searchParams.program] ?? searchParams.program
-      query = query.eq('faculties_or_streams.programs.name', programName)
+      const facultyList = faculties && faculties.length > 0 ? faculties : MOCK_FACULTIES
+      const facultyIds = facultyList
+        .filter(f => (f.programs as any)?.name === programName)
+        .map(f => f.id)
+      if (facultyIds.length > 0) {
+        query = query.in('faculty_id', facultyIds)
+      }
     }
 
     const { data: subjects } = await query.order('name').limit(50)
@@ -178,7 +184,7 @@ export default async function BrowsePage({ searchParams }: BrowsePageProps) {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex flex-col md:flex-row gap-6">
         {/* ── Mobile filter (collapsible) ──────────────── */}
-        <details className="md:hidden w-full mb-2 group">
+        <details className="md:hidden w-full mb-2 group" suppressHydrationWarning>
           <summary className="flex items-center justify-between cursor-pointer list-none rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
             <span className="flex items-center gap-2">
               <SlidersHorizontal size={15} className="text-slate-400" />
@@ -227,7 +233,7 @@ export default async function BrowsePage({ searchParams }: BrowsePageProps) {
                 const shouldOpen = isSelected || pi < 3
 
                 return (
-                  <details key={prog.id} open={shouldOpen} className="group">
+                  <details key={prog.id} open={shouldOpen} className="group" suppressHydrationWarning>
                     <summary className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 list-none">
                       <ChevronDown size={14} className="text-slate-400 transition-transform group-open:rotate-0 -rotate-90" />
                       <span className={`text-sm ${isSelected ? 'font-bold text-indigo-700 dark:text-indigo-400' : 'font-semibold text-slate-700 dark:text-slate-200'}`}>
