@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   keywords: ['Nepal education', 'SEE notes', 'NEB notes', 'Loksewa preparation', 'past papers Nepal', 'free study materials'],
   openGraph: {
     title: 'VidyaSetu — The Bridge to Every Exam',
-    description: 'Free digital education platform for Nepali students.',
+    description: "Nepal's comprehensive free digital education platform with curated notes, past papers, MCQ practice, and timed quizzes for Secondary, Higher Secondary, Bachelor, and Loksewa exams.",
     siteName: 'VidyaSetu',
     locale: 'en_US',
     type: 'website',

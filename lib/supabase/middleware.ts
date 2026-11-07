@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isDemoMode, DEMO_SESSION_COOKIE } from './demo-db'
 import { getUserById } from './demo-db'
+import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from './connect'
 
 export async function updateSession(request: NextRequest) {
   const protectedPaths = ['/dashboard', '/contribute', '/admin', '/quiz/', '/mcq', '/bookmarks']
@@ -28,9 +29,12 @@ export async function updateSession(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request })
 
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL).replace(/\/rest\/v1\/?$/, '')
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_PUBLIC_KEY
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll() {

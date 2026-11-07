@@ -12,15 +12,16 @@ export const DUMMY_FILE_URL = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/r
 
 export type Row = Record<string, unknown>
 
+import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from './connect'
+
 export function isDemoMode(): boolean {
   if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') return true
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL || ''
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_PUBLIC_KEY || ''
   return (
     !url ||
     url.includes('YOUR_PROJECT_REF') ||
     url.includes('example.supabase') ||
-    url.includes('faxixhokyiouwrgekpek') ||
     !key ||
     key.includes('your-anon-key')
   )
