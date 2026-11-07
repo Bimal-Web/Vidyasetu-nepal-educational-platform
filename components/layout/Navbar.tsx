@@ -71,15 +71,6 @@ const classDropdownItems = [
   },
 ]
 
-const desktopMainLinks = [
-  { label: 'Notes', href: '/browse?type=note' },
-  { label: 'Past Papers', href: '/browse?type=past_paper' },
-  // 'Classes' rendered as interactive dropdown
-  { label: 'MCQs', href: '/browse?type=mcq' },
-  { label: 'Quizzes', href: '/browse?type=quiz' },
-  { label: 'Loksewa', href: '/browse?program=loksewa' },
-  { label: 'Leaderboard', href: '/leaderboard' },
-]
 
 interface SearchSuggestion {
   id: string

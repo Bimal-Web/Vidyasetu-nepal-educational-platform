@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/src/supabaseClient'
 import { isDemoMode } from '@/lib/supabase/demo-db'
 import { 
-  Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowRight, 
-  ArrowLeft, Star, Sun, Moon, GraduationCap, Award, Laptop, FileText, Check
+  Mail, Lock, User, AtSign, Eye, EyeOff, Sparkles, ArrowRight, 
+  ArrowLeft, Star, Sun, Moon, GraduationCap, Award, Laptop, FileText, Check, ShieldCheck
 } from 'lucide-react'
 import { Logo } from '@/components/layout/Logo'
 
@@ -28,15 +29,16 @@ function FloatingOrb({ className }: { className: string }) {
 }
 
 const ACADEMIC_STREAMS = [
-  { id: 'secondary', label: 'SEE Class 10', icon: GraduationCap },
-  { id: 'plus2', label: '+2 NEB Board', icon: FileText },
-  { id: 'loksewa', label: 'Loksewa PSC', icon: Award },
-  { id: 'bachelor', label: 'TU / KU Degree', icon: Laptop },
+  { id: 'secondary', label: 'SEE Class 10', badge: 'CDC Official', icon: GraduationCap },
+  { id: 'plus2', label: '+2 NEB Board', badge: 'NEB Board', icon: FileText },
+  { id: 'loksewa', label: 'Loksewa PSC', badge: 'Public Service', icon: Award },
+  { id: 'bachelor', label: 'TU / KU Degree', badge: 'University', icon: Laptop },
 ]
 
 export default function SignupPage() {
   const router = useRouter()
 
+  const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -66,13 +68,13 @@ export default function SignupPage() {
   // Password strength calculation
   const getPasswordStrength = () => {
     if (!password) return { score: 0, label: '', color: 'bg-slate-200 dark:bg-slate-700' }
-    if (password.length < 8) return { score: 1, label: 'Too short (min. 8 chars)', color: 'bg-red-500' }
+    if (password.length < 8) return { score: 1, label: 'Too short (min. 8 characters)', color: 'bg-red-500' }
     let score = 1
     if (/[A-Z]/.test(password)) score++
     if (/[0-9]/.test(password)) score++
     if (/[^A-Za-z0-9]/.test(password)) score++
     
-    if (score === 2) return { score: 2, label: 'Fair password', color: 'bg-amber-500' }
+    if (score === 2) return { score: 2, label: 'Fair security', color: 'bg-amber-500' }
     if (score === 3) return { score: 3, label: 'Good password', color: 'bg-indigo-500' }
     return { score: 4, label: 'Strong password', color: 'bg-emerald-500' }
   }
@@ -82,12 +84,28 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (username.trim().length < 3) {
+      setError('Username must be at least 3 characters long.')
+      return
+    }
+
     setLoading(true)
 
     try {
+      const cleanUsername = username.trim().toLowerCase()
+      const cleanFullName = fullName.trim() || cleanUsername
+
       const { data, error: err } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: cleanFullName,
+            username: cleanUsername,
+            stream: selectedStream,
+          }
+        }
       })
 
       if (err) {
@@ -96,12 +114,12 @@ export default function SignupPage() {
         return
       }
 
-      // If user profile row can be created
+      // Upsert into public.users if accessible
       if (data?.user) {
         try {
           await supabase.from('users').upsert({
             id: data.user.id,
-            full_name: fullName || email.split('@')[0],
+            full_name: cleanFullName,
             email,
             auth_provider: 'email',
             role: 'student',
@@ -114,7 +132,7 @@ export default function SignupPage() {
       router.push('/')
       router.refresh()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'An error occurred during signup. Please try again.'
+      const msg = err instanceof Error ? err.message : 'An error occurred during account creation. Please try again.'
       setError(msg)
       setLoading(false)
     }
@@ -151,7 +169,7 @@ export default function SignupPage() {
     setError(null)
 
     try {
-      // In demo mode, sign in immediately with Google student identity without external blocks
+      // In demo mode, sign in immediately with Google student identity
       if (isDemoMode()) {
         await supabase.auth.signInWithOAuth({ provider: 'google' })
         setGoogleLoading(false)
@@ -217,7 +235,7 @@ export default function SignupPage() {
   return (
     <div className={`login-page-wrapper ${mounted ? 'login-mounted' : ''}`}>
       
-      {/* ── LEFT PANEL (Agency Brand & Academic Value Showcase) ── */}
+      {/* ── LEFT PANEL: National Educational Trust Showcase ── */}
       <div className="login-left-panel">
         <FloatingOrb className="login-orb-1" />
         <FloatingOrb className="login-orb-2" />
@@ -230,22 +248,44 @@ export default function SignupPage() {
           {/* Headline */}
           <div className="login-left-headline">
             <h2 className="login-left-title">
-              Start Your <span className="login-gradient-text">Academic Journey</span><br />
+              Empowering Every <span className="login-gradient-text">Student in Nepal</span><br />
               100% Free Forever.
             </h2>
             <p className="login-left-sub">
-              Join over 120,000+ Nepali students mastering SEE, +2 Board, University, and Loksewa PSC exams with verified notes and solved past papers.
+              Access curriculum-verified notes, official solved past papers, and timed MCQ mock examinations covering SEE, +2 Board, University, and Loksewa PSC.
             </p>
           </div>
 
+          {/* Ambient Platform Photo Preview */}
+          <div className="relative rounded-2xl overflow-hidden border border-white/15 shadow-xl aspect-[16/9] max-w-md bg-slate-900 group">
+            <Image
+              src="/images/about_hero_learning.jpg"
+              alt="Nepali students studying with VidyaSetu"
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-700"
+              sizes="(max-width: 1024px) 100vw, 420px"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
+              <span className="font-semibold flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                CDC & TU Verified
+              </span>
+              <span className="text-[11px] text-slate-300 font-mono tabular-nums">
+                120K+ Active Learners
+              </span>
+            </div>
+          </div>
+
           {/* Core Value Pillars */}
-          <div className="space-y-3 max-w-md">
+          <div className="space-y-2.5 max-w-md">
             {[
-              { title: '24,000+ Verified Study Materials', desc: 'Chapter notes, model solutions & formula handbooks.' },
-              { title: 'Official CDC & TU Syllabus Aligned', desc: 'Accurate to the latest 2081/82 examination guidelines.' },
-              { title: 'Offline-Ready Study Cache', desc: 'Download modules to your device and revise with zero data.' },
+              { title: 'Official Curriculum Aligned', desc: 'Syllabi accredited by CDC Sanothimi, NEB, and Tribhuvan University.' },
+              { title: 'Offline-Optimized PDFs', desc: 'Direct, lightweight Google Drive mirrors built for remote study.' },
+              { title: 'Interactive MCQ Engines', desc: 'Real exam timed practice with instant explanations and rank tracking.' },
             ].map((item, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md">
+              <div key={i} className="flex items-start gap-3 p-2.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md">
                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
                   <Check size={12} className="stroke-[3]" />
                 </div>
@@ -257,38 +297,38 @@ export default function SignupPage() {
             ))}
           </div>
 
-          {/* Student Success Showcase */}
-          <div className="login-testimonial">
-            <div className="flex items-center justify-between mb-2">
+          {/* Student Success Endorsement */}
+          <div className="login-testimonial max-w-md">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="login-testimonial-stars">
                 {[0, 1, 2, 3, 4].map(i => (
-                  <Star key={i} size={13} fill="#fbbf24" stroke="none" />
+                  <Star key={i} size={12} fill="#fbbf24" stroke="none" />
                 ))}
               </div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
-                Verified Topper
+                Verified Student
               </span>
             </div>
-            <p className="login-testimonial-text">
-              &ldquo;VidyaSetu provided everything I needed for Loksewa preparation. The solved past papers and timed MCQ mock tests doubled my confidence!&rdquo;
+            <p className="login-testimonial-text text-xs leading-relaxed">
+              &ldquo;VidyaSetu bridged the gap when our district college lacked model question solutions. I prepared for my +2 Board and scored an A+!&rdquo;
             </p>
-            <div className="login-testimonial-author">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-                BS
+            <div className="login-testimonial-author mt-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-bold text-[11px] flex items-center justify-center shadow-xs">
+                AS
               </div>
               <div>
-                <div className="login-testimonial-name">Bikram Shrestha</div>
-                <div className="login-testimonial-role">Loksewa PSC Mock Exam &bull; Rank 1 (98/100)</div>
+                <div className="login-testimonial-name text-xs">Aayush Shrestha</div>
+                <div className="login-testimonial-role text-[10px]">Class 12 NEB Science &bull; Koshi Province</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── RIGHT PANEL (Focused Form Experience) ── */}
+      {/* ── RIGHT PANEL: Refined Modern Registration Form ── */}
       <div className="login-right-panel overflow-y-auto">
         <div className="login-form-wrapper py-8 sm:py-12 my-auto">
-          {/* Top bar controls */}
+          {/* Top navigation controls */}
           <div className="flex items-center justify-between mb-6">
             <Link 
               href="/" 
@@ -318,7 +358,7 @@ export default function SignupPage() {
             </div>
             <h1 className="login-form-title">Create your account</h1>
             <p className="login-form-sub">
-              Free forever &bull; No credit card or payment required
+              Free forever &bull; Join 120,000+ Nepali students today
             </p>
           </div>
 
@@ -354,26 +394,50 @@ export default function SignupPage() {
           </div>
 
           {/* Registration Form */}
-          <form onSubmit={handleSignup} className="login-form">
+          <form onSubmit={handleSignup} className="login-form space-y-4">
             
-            {/* Full Name */}
-            <div className="login-field">
-              <label htmlFor="signup-name" className="login-label">
-                Full Name
-              </label>
-              <div className="login-input-wrap">
-                <User size={16} className="login-input-icon" />
-                <input 
-                  id="signup-name" 
-                  type="text" 
-                  value={fullName} 
-                  onChange={e => setFullName(e.target.value)}
-                  required 
-                  autoComplete="name" 
-                  placeholder="e.g. Bimal Ghorsai" 
-                  className="login-input" 
-                  suppressHydrationWarning
-                />
+            {/* Username & Full Name Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Username */}
+              <div className="login-field">
+                <label htmlFor="signup-username" className="login-label">
+                  Username
+                </label>
+                <div className="login-input-wrap">
+                  <AtSign size={15} className="login-input-icon text-indigo-500" />
+                  <input 
+                    id="signup-username" 
+                    type="text" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
+                    required 
+                    autoComplete="username" 
+                    placeholder="e.g. aayush_nepal" 
+                    className="login-input" 
+                    suppressHydrationWarning
+                  />
+                </div>
+              </div>
+
+              {/* Full Name */}
+              <div className="login-field">
+                <label htmlFor="signup-name" className="login-label">
+                  Full Name
+                </label>
+                <div className="login-input-wrap">
+                  <User size={15} className="login-input-icon" />
+                  <input 
+                    id="signup-name" 
+                    type="text" 
+                    value={fullName} 
+                    onChange={e => setFullName(e.target.value)}
+                    required 
+                    autoComplete="name" 
+                    placeholder="e.g. Aarav Sharma" 
+                    className="login-input" 
+                    suppressHydrationWarning
+                  />
+                </div>
               </div>
             </div>
 
@@ -383,7 +447,7 @@ export default function SignupPage() {
                 Email Address
               </label>
               <div className="login-input-wrap">
-                <Mail size={16} className="login-input-icon" />
+                <Mail size={15} className="login-input-icon" />
                 <input 
                   id="signup-email" 
                   type="email" 
@@ -400,9 +464,12 @@ export default function SignupPage() {
 
             {/* Target Academic Stream Selector */}
             <div className="login-field">
-              <label className="login-label">
-                Primary Exam Target
-              </label>
+              <div className="login-label-row">
+                <label className="login-label">
+                  Primary Academic Goal
+                </label>
+                <span className="text-[11px] text-slate-400">Customizes recommendations</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {ACADEMIC_STREAMS.map(stream => {
                   const Icon = stream.icon
@@ -412,15 +479,22 @@ export default function SignupPage() {
                       key={stream.id}
                       type="button"
                       onClick={() => setSelectedStream(stream.id)}
-                      className={`flex items-center gap-2 p-2 rounded-xl text-xs font-semibold border transition-all text-left ${
+                      className={`flex flex-col p-2.5 rounded-xl text-left border transition-all ${
                         active
-                          ? 'bg-indigo-50 dark:bg-indigo-950/70 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-2xs'
+                          ? 'bg-indigo-50/90 dark:bg-indigo-950/70 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs'
                           : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                       }`}
                       suppressHydrationWarning
                     >
-                      <Icon size={14} className={active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'} />
-                      <span className="truncate">{stream.label}</span>
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <Icon size={14} className={active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'} />
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                          active ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300' : 'text-slate-400'
+                        }`}>
+                          {stream.badge}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold truncate">{stream.label}</span>
                     </button>
                   )
                 })}
@@ -436,7 +510,7 @@ export default function SignupPage() {
                 <span className="text-[11px] text-slate-400">Min. 8 characters</span>
               </div>
               <div className="login-input-wrap">
-                <Lock size={16} className="login-input-icon" />
+                <Lock size={15} className="login-input-icon" />
                 <input 
                   id="signup-password" 
                   type={showPass ? 'text' : 'password'} 
@@ -444,7 +518,7 @@ export default function SignupPage() {
                   onChange={e => setPassword(e.target.value)}
                   required 
                   autoComplete="new-password" 
-                  placeholder="Create a secure password" 
+                  placeholder="Create a strong password" 
                   className="login-input login-input-pass" 
                   suppressHydrationWarning
                 />
@@ -456,7 +530,7 @@ export default function SignupPage() {
                   aria-label={showPass ? 'Hide password' : 'Show password'}
                   suppressHydrationWarning
                 >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
 
@@ -509,20 +583,33 @@ export default function SignupPage() {
             </p>
           )}
 
+          {/* Trust Guarantees */}
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-4 text-[11px] text-slate-400 dark:text-slate-500">
+            <span className="flex items-center gap-1">
+              <Check size={12} className="text-emerald-500" /> Free Forever
+            </span>
+            <span className="flex items-center gap-1">
+              <ShieldCheck size={12} className="text-indigo-500" /> 256-Bit Encrypted
+            </span>
+            <span className="flex items-center gap-1">
+              <Check size={12} className="text-emerald-500" /> Zero Spam
+            </span>
+          </div>
+
           {/* Terms & Privacy */}
-          <p className="text-center text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-            By creating an account, you agree to our{' '}
-            <Link href="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+          <p className="text-center text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed mt-4 mb-4">
+            By registering, you agree to VidyaSetu&apos;s{' '}
+            <Link href="/terms" className="text-indigo-600 dark:text-indigo-400 hover:underline">
               Terms of Service
             </Link>{' '}
             and{' '}
-            <Link href="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+            <Link href="/privacy" className="text-indigo-600 dark:text-indigo-400 hover:underline">
               Privacy Policy
             </Link>.
           </p>
 
           {/* Switch to Login */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+          <div className="text-center">
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
               Already have an account?{' '}
               <Link 

@@ -549,7 +549,7 @@ export function BrowseExplorer({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 self-end sm:self-center shrink-0">
+                  <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                     {/* Counts pill */}
                     <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 font-medium">
                       <span title="Available notes"><strong>{noteCount}</strong> notes</span>

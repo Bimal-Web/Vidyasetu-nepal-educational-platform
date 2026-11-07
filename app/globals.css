@@ -3073,10 +3073,13 @@ html:not(.dark) .marquee-item:hover {
   max-width: 1100px;
   margin: 0 auto;
 }
-@media (min-width: 640px) {
+@media (min-width: 640px) and (max-width: 1023px) {
   .bento-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .bento-span-4 { grid-column: span 2; }
+  .bento-span-3 { grid-column: span 2; }
+  .bento-span-2 { grid-column: span 1; }
 }
 @media (min-width: 1024px) {
   .bento-grid {
@@ -3085,6 +3088,14 @@ html:not(.dark) .marquee-item:hover {
   .bento-span-4 { grid-column: span 4; }
   .bento-span-3 { grid-column: span 3; }
   .bento-span-2 { grid-column: span 2; }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .bento-card {

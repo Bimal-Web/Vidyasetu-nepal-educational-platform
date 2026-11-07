@@ -7,7 +7,7 @@ import Image from 'next/image'
 import {
   ArrowRight, WifiOff, Users, TrendingUp, ShieldCheck,
   Map, BookOpen, Award, Star, Quote, Zap, Sparkles,
-  CheckCircle2, HardDrive, MessageSquare, BarChart3, Check
+  CheckCircle2, Check
 } from 'lucide-react'
 
 async function getStats() {

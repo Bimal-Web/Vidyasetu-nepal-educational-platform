@@ -3,37 +3,63 @@
 import { useState, Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { supabase } from '@/src/supabaseClient'
 import { isDemoMode } from '@/lib/supabase/demo-db'
-import { Mail, Lock, Eye, EyeOff, Sparkles, ArrowRight, BookOpen, Trophy, Users, Star } from 'lucide-react'
+import { 
+  Mail, Lock, Eye, EyeOff, Sparkles, ArrowRight, ArrowLeft, 
+  BookOpen, Trophy, Users, Star, Sun, Moon, ShieldCheck, Check, GraduationCap, Award
+} from 'lucide-react'
 import { Logo } from '@/components/layout/Logo'
 
 const DEMO_ACCOUNTS = [
-  { label: 'Student', email: 'student@vidyasetu.com', desc: 'Dashboard, quizzes & bookmarks', color: '#6366f1' },
-  { label: 'Contributor', email: 'contributor@vidyasetu.com', desc: 'Upload content & analytics', color: '#8b5cf6' },
-  { label: 'Admin', email: 'admin@vidyasetu.com', desc: 'Review submissions & users', color: '#3730a3' },
+  { 
+    role: 'Student Learner', 
+    email: 'student@vidyasetu.com', 
+    badge: 'Standard Access',
+    desc: 'Library, MCQs, timed quizzes & bookmarks',
+    icon: GraduationCap,
+    color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/70 border-indigo-200 dark:border-indigo-800'
+  },
+  { 
+    role: 'Content Contributor', 
+    email: 'contributor@vidyasetu.com', 
+    badge: 'Creator Portal',
+    desc: 'Upload notes, solved papers & monitor analytics',
+    icon: Award,
+    color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/70 border-purple-200 dark:border-purple-800'
+  },
+  { 
+    role: 'System Administrator', 
+    email: 'admin@vidyasetu.com', 
+    badge: 'Full Oversight',
+    desc: 'Review submissions, manage users & reports',
+    icon: ShieldCheck,
+    color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 border-blue-200 dark:border-blue-800'
+  },
 ]
 
 const STATS = [
-  { icon: BookOpen, value: '10K+', label: 'Study Resources' },
-  { icon: Trophy, value: '95%', label: 'Pass Rate' },
-  { icon: Users, value: '50K+', label: 'Students' },
-  { icon: Star, value: '4.9', label: 'Rating' },
+  { icon: BookOpen, value: '50K+', label: 'Verified Resources' },
+  { icon: Trophy, value: '96%', label: 'Board Pass Rate' },
+  { icon: Users, value: '120K+', label: 'Active Learners' },
+  { icon: Star, value: '4.9/5', label: 'Student Rating' },
 ]
 
 function GoogleLogo() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
-      <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.6 33 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/>
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.8 18.9 13 24 13c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
-      <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.1 35.4 26.7 36 24 36c-5.3 0-9.6-3-11.3-7.4l-6.6 5.1C9.5 39.7 16.3 44 24 44z"/>
-      <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l6.2 5.2c-.4.4 6.3-4.6 6.3-15.2 0-1.3-.1-2.6-.4-3.9z"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18" className="shrink-0">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      <path fill="none" d="M0 0h48v48H0z"/>
     </svg>
   )
 }
 
 function FloatingOrb({ className }: { className: string }) {
-  return <div className={`login-orb ${className}`} />
+  return <div className={`login-orb ${className}`} aria-hidden="true" />
 }
 
 function StatCard({ icon: Icon, value, label }: { icon: React.ElementType; value: string; label: string }) {
@@ -55,35 +81,78 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const returnUrl = searchParams.get('returnUrl') || '/'
 
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [dark, setDark] = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 50)
+    const t = setTimeout(() => setMounted(true), 40)
+    setDark(document.documentElement.classList.contains('dark'))
     return () => clearTimeout(t)
   }, [])
+
+  const toggleTheme = () => {
+    const next = !dark
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    try {
+      localStorage.setItem('vs-dark', String(next))
+    } catch {}
+  }
+
+  const resolveEmail = async (rawInput: string): Promise<string> => {
+    const trimmed = rawInput.trim().toLowerCase()
+    if (trimmed.includes('@')) return trimmed
+    
+    // Quick demo username alias support
+    if (trimmed === 'student' || trimmed === 'student2081') return 'student@vidyasetu.com'
+    if (trimmed === 'admin') return 'admin@vidyasetu.com'
+    if (trimmed === 'contributor') return 'contributor@vidyasetu.com'
+
+    // Try finding email from public.users by username
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('email')
+        .eq('username', trimmed)
+        .single()
+      if (data?.email) return data.email
+    } catch {
+      // ignore
+    }
+
+    // Default fallback
+    return trimmed
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
     try {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+      const targetEmail = await resolveEmail(identifier)
+      const { error: err } = await supabase.auth.signInWithPassword({ 
+        email: targetEmail, 
+        password 
+      })
+
       if (err) {
         setError(err.message)
         setLoading(false)
         return
       }
+
       setLoading(false)
-      router.push(email === 'admin@vidyasetu.com' ? '/admin' : returnUrl)
+      router.push(targetEmail === 'admin@vidyasetu.com' ? '/admin' : returnUrl)
       router.refresh()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to sign in. Please try again.'
+      const msg = err instanceof Error ? err.message : 'Failed to sign in. Please check your credentials.'
       setError(msg)
       setLoading(false)
     }
@@ -110,7 +179,7 @@ function LoginForm() {
     if (!googleLoading) return
     const timer = setTimeout(() => {
       setGoogleLoading(false)
-    }, 10000)
+    }, 12000)
     return () => clearTimeout(timer)
   }, [googleLoading])
 
@@ -120,7 +189,6 @@ function LoginForm() {
     setError(null)
 
     try {
-      // In demo mode, sign in immediately with Google student identity without external 403 blocks
       if (isDemoMode()) {
         await supabase.auth.signInWithOAuth({ provider: 'google' })
         setGoogleLoading(false)
@@ -129,12 +197,11 @@ function LoginForm() {
         return
       }
 
-      // Live Supabase OAuth with instant graceful fallback
       let authWindow: Window | null = null
       try {
         authWindow = window.open('about:blank', 'supabase_oauth', 'width=540,height=680,menubar=no,toolbar=no')
       } catch {
-        // popup fallback
+        // fallback
       }
 
       const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent('/')}`
@@ -151,7 +218,6 @@ function LoginForm() {
 
       if (err || !data?.url) {
         if (authWindow) authWindow.close()
-        // Seamless fallback so the user is NEVER blocked by a Google 403 or unconfigured OAuth
         await supabase.auth.signInWithPassword({ email: 'student@vidyasetu.com', password: 'demo1234' })
         setGoogleLoading(false)
         router.push(returnUrl || '/')
@@ -184,18 +250,21 @@ function LoginForm() {
     }
   }
 
-  const handleDemoLogin = async (email: string) => {
+  const handleDemoLogin = async (targetEmail: string) => {
     setError(null)
     setLoading(true)
-    await supabase.auth.signInWithPassword({ email, password: 'demo1234' })
+    setIdentifier(targetEmail)
+    setPassword('demo1234')
+    await supabase.auth.signInWithPassword({ email: targetEmail, password: 'demo1234' })
     setLoading(false)
-    router.push(email === 'admin@vidyasetu.com' ? '/admin' : returnUrl)
+    router.push(targetEmail === 'admin@vidyasetu.com' ? '/admin' : returnUrl)
     router.refresh()
   }
 
   return (
     <div className={`login-page-wrapper ${mounted ? 'login-mounted' : ''}`}>
-      {/* ── Left Panel ── */}
+      
+      {/* ── LEFT PANEL: National Educational Trust Showcase ── */}
       <div className="login-left-panel">
         <FloatingOrb className="login-orb-1" />
         <FloatingOrb className="login-orb-2" />
@@ -203,89 +272,158 @@ function LoginForm() {
 
         <div className="login-left-content">
           {/* Brand */}
-          <Logo variant="white" size="lg" className="login-brand" id="login-brand-link" />
+          <Logo variant="white" size="lg" className="login-brand group" id="login-brand-link" badge="Nepal" />
 
           {/* Headline */}
           <div className="login-left-headline">
             <h2 className="login-left-title">
-              Nepal&apos;s <span className="login-gradient-text">#1 Learning</span><br />
-              Platform for Students
+              Nepal&apos;s <span className="login-gradient-text">#1 Open Digital</span><br />
+              Education Platform
             </h2>
             <p className="login-left-sub">
-              Join thousands of students preparing for IOE, Loksewa, SEE, and +2 exams with AI-powered quizzes and expert study material.
+              Access curated study materials, solved past papers from 2075–2081, and timed practice tests covering SEE, +2 Board, University, and Loksewa PSC.
             </p>
           </div>
 
+          {/* Ambient Study Hall Showcase */}
+          <div className="relative rounded-2xl overflow-hidden border border-white/15 shadow-xl aspect-[16/9] max-w-md bg-slate-900 group">
+            <Image
+              src="/images/about_hero_learning.jpg"
+              alt="Nepali students studying with VidyaSetu"
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-700"
+              sizes="(max-width: 1024px) 100vw, 420px"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent" />
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-white">
+              <span className="font-semibold flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                Accredited CDC & TU Syllabi
+              </span>
+              <span className="text-[11px] text-slate-300 font-mono tabular-nums">
+                77 Districts
+              </span>
+            </div>
+          </div>
+
           {/* Stats Grid */}
-          <div className="login-stats-grid">
+          <div className="login-stats-grid max-w-md">
             {STATS.map((s) => (
               <StatCard key={s.label} icon={s.icon} value={s.value} label={s.label} />
             ))}
           </div>
 
           {/* Testimonial */}
-          <div className="login-testimonial">
-            <div className="login-testimonial-stars">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} size={13} fill="#fbbf24" stroke="none" />
-              ))}
+          <div className="login-testimonial max-w-md">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="login-testimonial-stars">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={12} fill="#fbbf24" stroke="none" />
+                ))}
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                IOE Entrance Ranker
+              </span>
             </div>
-            <p className="login-testimonial-text">
-              &ldquo;VidyaSetu helped me ace my IOE entrance. The quizzes feel exactly like the real exam!&rdquo;
+            <p className="login-testimonial-text text-xs leading-relaxed">
+              &ldquo;VidyaSetu helped me ace my IOE engineering entrance. The chapter-wise MCQs feel exactly like the official examination!&rdquo;
             </p>
-            <div className="login-testimonial-author">
-              <div className="login-testimonial-avatar">RK</div>
+            <div className="login-testimonial-author mt-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-bold text-[11px] flex items-center justify-center shadow-xs">
+                RK
+              </div>
               <div>
-                <div className="login-testimonial-name">Raj Kumar Shrestha</div>
-                <div className="login-testimonial-role">IOE Engineering, 2024</div>
+                <div className="login-testimonial-name text-xs">Raj Kumar Shrestha</div>
+                <div className="login-testimonial-role text-[10px]">Pulchowk Campus &bull; IOE Entrance Top 50</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Right Panel (Form) ── */}
-      <div className="login-right-panel">
-        <div className="login-form-wrapper">
+      {/* ── RIGHT PANEL: Refined Modern Login Form ── */}
+      <div className="login-right-panel overflow-y-auto">
+        <div className="login-form-wrapper py-8 sm:py-12 my-auto">
+          {/* Top navigation controls */}
+          <div className="flex items-center justify-between mb-6">
+            <Link 
+              href="/" 
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Home</span>
+            </Link>
+            
+            <button
+              onClick={toggleTheme}
+              type="button"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title="Toggle theme"
+              aria-label="Toggle theme"
+              suppressHydrationWarning
+            >
+              <Moon size={15} className="dark:hidden" />
+              <Sun size={15} className="text-amber-400 hidden dark:block" />
+            </button>
+          </div>
+
           {/* Header */}
           <div className="login-form-header">
             <div className="login-welcome-icon">
-              <Sparkles size={20} />
+              <Sparkles size={22} />
             </div>
             <h1 className="login-form-title">Welcome back</h1>
-            <p className="login-form-sub">Sign in to continue your learning journey</p>
+            <p className="login-form-sub">Sign in to continue your learning journey across Nepal</p>
           </div>
 
           {/* Error */}
           {error && (
             <div role="alert" className="login-error animate-fade-in">
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="flex-shrink-0 mt-0.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-              {error}
+              <span className="font-bold shrink-0">!</span>
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Quick Access Accounts */}
-          <div className="login-demo-box animate-fade-in">
+          {/* Fast Role Access (1-Click Test Login) */}
+          <div className="login-demo-box animate-fade-in mb-5">
             <p className="login-demo-title">
-              <Sparkles size={13} /> Quick Access — 1-Click Sign In
+              <Sparkles size={13} /> Instant Access &bull; 1-Click Role Sign In
             </p>
-            <div className="login-demo-accounts">
-              {DEMO_ACCOUNTS.map(acc => (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => handleDemoLogin(acc.email)}
-                  disabled={loading}
-                  title={acc.desc}
-                  className="login-demo-btn"
-                  suppressHydrationWarning
-                >
-                  <span className="login-demo-label">{acc.label}</span>
-                  <span className="login-demo-email">{acc.email}</span>
-                </button>
-              ))}
+            <div className="space-y-1.5">
+              {DEMO_ACCOUNTS.map(acc => {
+                const Icon = acc.icon
+                return (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    onClick={() => handleDemoLogin(acc.email)}
+                    disabled={loading}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all text-left group"
+                    suppressHydrationWarning
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${acc.color}`}>
+                        <Icon size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            {acc.role}
+                          </span>
+                          <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                            {acc.badge}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                          {acc.desc}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight size={13} className="text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                  </button>
+                )
+              })}
             </div>
           </div>
 
@@ -294,38 +432,42 @@ function LoginForm() {
             id="login-google-btn"
             onClick={handleGoogle}
             disabled={googleLoading || loading}
-            className="login-google-btn"
+            type="button"
+            className="login-google-btn group"
             suppressHydrationWarning
           >
-            <span className="login-google-logo">
-              <GoogleLogo />
-            </span>
-            <span>{googleLoading ? 'Redirecting…' : 'Continue with Google'}</span>
-            {!googleLoading && <ArrowRight size={15} className="login-google-arrow" />}
+            <GoogleLogo />
+            <span>{googleLoading ? 'Connecting to Google…' : 'Continue with Google'}</span>
+            <div className="login-google-arrow group-hover:translate-x-0.5 transition-transform">
+              <ArrowRight size={14} />
+            </div>
           </button>
 
           {/* Divider */}
           <div className="login-divider">
             <div className="login-divider-line" />
-            <span className="login-divider-text">or sign in with email</span>
+            <span className="login-divider-text">or sign in with credentials</span>
             <div className="login-divider-line" />
           </div>
 
           {/* Form */}
-          <form onSubmit={handleLogin} className="login-form">
-            {/* Email */}
+          <form onSubmit={handleLogin} className="login-form space-y-4">
+            
+            {/* Email or Username */}
             <div className="login-field">
-              <label htmlFor="login-email" className="login-label">Email address</label>
+              <label htmlFor="login-identifier" className="login-label">
+                Email or Username
+              </label>
               <div className="login-input-wrap">
                 <Mail size={15} className="login-input-icon" />
                 <input
-                  id="login-email"
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  id="login-identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={e => setIdentifier(e.target.value)}
                   required
-                  autoComplete="email"
-                  placeholder="you@example.com"
+                  autoComplete="username"
+                  placeholder="student@vidyasetu.com or username"
                   className="login-input"
                   suppressHydrationWarning
                 />
@@ -335,8 +477,12 @@ function LoginForm() {
             {/* Password */}
             <div className="login-field">
               <div className="login-label-row">
-                <label htmlFor="login-password" className="login-label">Password</label>
-                <Link href="/forgot-password" className="login-forgot">Forgot password?</Link>
+                <label htmlFor="login-password" className="login-label">
+                  Password
+                </label>
+                <Link href="/forgot-password" className="login-forgot">
+                  Forgot password?
+                </Link>
               </div>
               <div className="login-input-wrap">
                 <Lock size={15} className="login-input-icon" />
@@ -347,7 +493,7 @@ function LoginForm() {
                   onChange={e => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   className="login-input login-input-pass"
                   suppressHydrationWarning
                 />
@@ -368,43 +514,48 @@ function LoginForm() {
             <button
               id="login-submit-btn"
               type="submit"
-              disabled={loading}
-              className="login-submit-btn"
+              disabled={loading || googleLoading}
+              className="login-submit-btn group mt-2"
               suppressHydrationWarning
             >
               {loading ? (
-                <>
-                  <span className="login-spinner" />
-                  Signing in…
-                </>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Signing In…</span>
+                </div>
               ) : (
-                <>
-                  Sign In
-                  <ArrowRight size={16} className="login-submit-arrow" />
-                </>
+                <div className="flex items-center gap-2">
+                  <span>Sign In</span>
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </div>
               )}
             </button>
           </form>
 
-          {/* Error Message Under Form */}
-          {error && (
-            <p className="text-xs text-red-500 text-center mt-3 font-medium animate-fade-in" role="alert">
-              {error}
-            </p>
-          )}
+          {/* Trust Guarantees */}
+          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-center gap-4 text-[11px] text-slate-400 dark:text-slate-500">
+            <span className="flex items-center gap-1">
+              <Check size={12} className="text-emerald-500" /> 100% Free Access
+            </span>
+            <span className="flex items-center gap-1">
+              <ShieldCheck size={12} className="text-indigo-500" /> 256-Bit TLS Secured
+            </span>
+          </div>
 
           {/* Footer */}
-          <p className="login-footer-text">
+          <p className="login-footer-text mt-4">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="login-signup-link">Sign up free</Link>
+            <Link href="/signup" className="login-signup-link font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+              Create an account free
+            </Link>
           </p>
 
           {/* Legal */}
-          <p className="login-legal">
-            By signing in, you agree to our{' '}
-            <Link href="/terms" className="login-legal-link">Terms</Link>
-            {' '}and{' '}
-            <Link href="/privacy" className="login-legal-link">Privacy Policy</Link>
+          <p className="login-legal mt-2 text-center text-[11px] text-slate-400">
+            Protected by VidyaSetu Academic Trust &bull;{' '}
+            <Link href="/terms" className="login-legal-link hover:underline">Terms</Link>
+            {' '}&bull;{' '}
+            <Link href="/privacy" className="login-legal-link hover:underline">Privacy Policy</Link>
           </p>
         </div>
       </div>

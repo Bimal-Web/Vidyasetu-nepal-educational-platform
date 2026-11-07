@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Eye, Download, FileText, ExternalLink, Clock, ArrowRight, BookOpen, Loader2, CheckCircle2, Brain, Search, Sparkles } from 'lucide-react'
+import { Eye, Download, FileText, ExternalLink, Clock, ArrowRight, BookOpen, Loader2, CheckCircle2, Brain, Search } from 'lucide-react'
 import { formatFileSize, formatDate } from '@/lib/utils'
 import type { Content, Quiz, Subject } from '@/types'
 import { DiscussionTab } from './DiscussionTab'
@@ -77,7 +77,7 @@ function ContentRow({ item, onDownload, downloading }: { item: Content; onDownlo
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors min-h-[38px]"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors min-h-[40px] sm:min-h-[36px]"
             title="Preview on Google Drive"
           >
             <ExternalLink size={14} />
@@ -88,7 +88,7 @@ function ContentRow({ item, onDownload, downloading }: { item: Content; onDownlo
           <button
             onClick={() => onDownload(item.id)}
             disabled={downloading}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors shadow-2xs hover:shadow-indigo-500/25 disabled:opacity-50 min-h-[38px]"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition-colors shadow-2xs hover:shadow-indigo-500/25 disabled:opacity-50 min-h-[40px] sm:min-h-[36px]"
             title="Download PDF"
           >
             {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}

@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import {
-  BookOpen, FileText, ChevronRight, ExternalLink,
+  FileText, ChevronRight, ExternalLink,
   Atom, FlaskConical, Eye, Sparkles, GraduationCap, ArrowUpRight
 } from 'lucide-react'
 
@@ -288,7 +288,7 @@ export default function Class11Page() {
         </div>
 
         {/* Embedded Iframe */}
-        <div className={`relative w-full bg-slate-950 ${isFullscreen ? 'flex-1' : ''}`} style={!isFullscreen ? { height: '78vh', minHeight: 560 } : {}}>
+        <div className={`relative w-full bg-slate-950 ${isFullscreen ? 'flex-1' : ''}`} style={!isFullscreen ? { height: 'clamp(420px, 75vh, 850px)' } : {}}>
           {activeSubject && activeSubject.fileId ? (
             <iframe
               key={activeSubject.fileId}

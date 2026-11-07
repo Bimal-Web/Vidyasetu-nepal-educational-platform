@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import {
-  ArrowRight, CheckCircle2, Zap, BookOpen, Award, Star,
+  ArrowRight, Award, Star,
   TrendingUp, Users, BookMarked, Trophy, Sparkles,
-  ShieldCheck, Radio, GraduationCap, Laptop, FileText, Check
+  GraduationCap, Laptop, FileText, Check, Radio, ShieldCheck
 } from 'lucide-react'
 import { AVATAR_COLORS } from '@/lib/utils'
 import { useEffect, useRef, useState } from 'react'
@@ -153,11 +153,11 @@ export function LandingHero({
             </p>
 
             {/* Primary & Secondary Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3.5 mb-7">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 mb-7 w-full sm:w-auto">
               <Link 
                 href="/signup" 
                 id="hero-cta-primary" 
-                className="btn-nested-pill bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white shadow-[0_10px_25px_-5px_rgba(79,70,229,0.4),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_16px_36px_-6px_rgba(79,70,229,0.55)] group"
+                className="btn-nested-pill w-full sm:w-auto justify-center bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white shadow-[0_10px_25px_-5px_rgba(79,70,229,0.4),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:shadow-[0_16px_36px_-6px_rgba(79,70,229,0.55)] group"
               >
                 <span className="font-bold tracking-tight text-sm sm:text-base">Start Learning Free</span>
                 <span className="btn-nested-icon bg-white/20 dark:bg-black/25 text-white shadow-2xs group-hover:scale-110">
@@ -167,7 +167,7 @@ export function LandingHero({
               <Link 
                 href="/browse" 
                 id="hero-cta-secondary" 
-                className="btn-nested-pill bg-white hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 border border-slate-200/90 dark:border-slate-800 text-slate-800 dark:text-slate-200 shadow-2xs group"
+                className="btn-nested-pill w-full sm:w-auto justify-center bg-white hover:bg-slate-50 dark:bg-slate-900/90 dark:hover:bg-slate-800/90 border border-slate-200/90 dark:border-slate-800 text-slate-800 dark:text-slate-200 shadow-2xs group"
               >
                 <span className="font-semibold text-sm">Explore All {totalSubjects}+ Subjects</span>
                 <span className="btn-nested-icon bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 group-hover:translate-x-0.5">

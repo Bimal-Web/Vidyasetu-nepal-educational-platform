@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import {
-  BookOpen, FileText, ChevronRight, ExternalLink, X,
+  BookOpen, FileText, ChevronRight, ExternalLink,
   Heart, Globe, Wrench, Eye
 } from 'lucide-react'
 
@@ -198,12 +198,12 @@ export default function Class8Page() {
             </div>
 
             {/* Quick Switch Pills */}
-            <div className="hidden md:flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs">
+            <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs overflow-x-auto no-scrollbar max-w-full">
               {CLASS8_SUBJECTS.map(s => (
                 <button
                   key={s.id}
                   onClick={() => openViewer(s)}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
+                  className={`px-2.5 py-1 rounded-lg font-medium transition-all whitespace-nowrap shrink-0 ${
                     activeSubject?.id === s.id
                       ? 'bg-indigo-600 text-white font-semibold shadow-xs'
                       : 'text-slate-300 hover:text-white hover:bg-slate-700/60'
@@ -216,7 +216,7 @@ export default function Class8Page() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-auto lg:ml-0">
             {activeSubject?.fileId && (
               <a
                 href={`https://drive.google.com/file/d/${activeSubject.fileId}/view`}
@@ -241,7 +241,7 @@ export default function Class8Page() {
         </div>
 
         {/* Embedded Iframe */}
-        <div className={`relative w-full bg-slate-950 ${isFullscreen ? 'flex-1' : ''}`} style={!isFullscreen ? { height: '78vh', minHeight: 560 } : {}}>
+        <div className={`relative w-full bg-slate-950 ${isFullscreen ? 'flex-1' : ''}`} style={!isFullscreen ? { height: 'clamp(420px, 75vh, 850px)' } : {}}>
           {activeSubject && activeSubject.fileId ? (
             <iframe
               key={activeSubject.fileId}
