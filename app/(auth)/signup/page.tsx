@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/src/supabaseClient'
-import { isDemoMode } from '@/lib/supabase/demo-db'
+import { createClient } from '@/lib/supabase/client'
 import { 
   Mail, Lock, User, AtSign, Eye, EyeOff, Sparkles, ArrowRight, 
-  ArrowLeft, Star, Sun, Moon, GraduationCap, Award, Laptop, FileText, Check, ShieldCheck
+  ArrowLeft, Star, Sun, Moon, GraduationCap, Award, Laptop, FileText, Check, ShieldCheck, CheckCircle2
 } from 'lucide-react'
 import { Logo } from '@/components/layout/Logo'
 
@@ -37,6 +36,7 @@ const ACADEMIC_STREAMS = [
 
 export default function SignupPage() {
   const router = useRouter()
+  const supabase = createClient()
 
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -47,6 +47,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [signupSuccess, setSignupSuccess] = useState<{ email: string; requiresConfirmation: boolean } | null>(null)
   const [mounted, setMounted] = useState(false)
   const [dark, setDark] = useState(false)
 
@@ -96,8 +97,14 @@ export default function SignupPage() {
       const cleanUsername = username.trim().toLowerCase()
       const cleanFullName = fullName.trim() || cleanUsername
 
+      // Clear legacy demo session cookie
+      try {
+        document.cookie = 'vs-demo-user=; path=/; max-age=0'
+        localStorage.removeItem('vs-demo-user')
+      } catch {}
+
       const { data, error: err } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
@@ -114,23 +121,14 @@ export default function SignupPage() {
         return
       }
 
-      // Upsert into public.users if accessible
-      if (data?.user) {
-        try {
-          await supabase.from('users').upsert({
-            id: data.user.id,
-            full_name: cleanFullName,
-            email,
-            auth_provider: 'email',
-            role: 'student',
-          })
-        } catch {
-          // ignore profile upsert error
-        }
-      }
+      setLoading(false)
 
-      router.push('/')
-      router.refresh()
+      if (data?.session) {
+        router.push('/dashboard')
+        router.refresh()
+      } else {
+        setSignupSuccess({ email: email.trim().toLowerCase(), requiresConfirmation: true })
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'An error occurred during account creation. Please try again.'
       setError(msg)
@@ -169,23 +167,6 @@ export default function SignupPage() {
     setError(null)
 
     try {
-      // In demo mode, sign in immediately with Google student identity
-      if (isDemoMode()) {
-        await supabase.auth.signInWithOAuth({ provider: 'google' })
-        setGoogleLoading(false)
-        router.push('/')
-        router.refresh()
-        return
-      }
-
-      // Live Supabase OAuth with graceful fallback
-      let authWindow: Window | null = null
-      try {
-        authWindow = window.open('about:blank', 'supabase_oauth', 'width=540,height=680,menubar=no,toolbar=no')
-      } catch {
-        // fallback
-      }
-
       const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent('/')}`
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -193,42 +174,27 @@ export default function SignupPage() {
           redirectTo: callbackUrl,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
+            prompt: 'select_account',
           },
         },
       })
 
-      if (err || !data?.url) {
-        if (authWindow) authWindow.close()
-        await supabase.auth.signInWithPassword({ email: 'student@vidyasetu.com', password: 'demo1234' })
+      if (err) {
+        setError(err.message || 'Failed to start Google sign-up.')
         setGoogleLoading(false)
-        router.push('/')
-        router.refresh()
         return
       }
 
-      if (authWindow && !authWindow.closed) {
-        authWindow.location.href = data.url
-        const timer = setInterval(() => {
-          if (authWindow?.closed) {
-            clearInterval(timer)
-            setGoogleLoading(false)
-            supabase.auth.getSession().then(({ data: s }) => {
-              if (s?.session) {
-                router.push('/')
-                router.refresh()
-              }
-            })
-          }
-        }, 1000)
-      } else {
+      if (data?.url) {
         window.location.href = data.url
+      } else {
+        setError('No authorization URL returned from Supabase.')
+        setGoogleLoading(false)
       }
-    } catch {
-      await supabase.auth.signInWithPassword({ email: 'student@vidyasetu.com', password: 'demo1234' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google authentication could not be completed.'
+      setError(msg)
       setGoogleLoading(false)
-      router.push('/')
-      router.refresh()
     }
   }
 
@@ -393,8 +359,39 @@ export default function SignupPage() {
             <div className="login-divider-line" />
           </div>
 
-          {/* Registration Form */}
-          <form onSubmit={handleSignup} className="login-form space-y-4">
+          {/* Registration Success or Form */}
+          {signupSuccess ? (
+            <div className="p-6 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center animate-fade-in my-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3 shadow-xs">
+                <CheckCircle2 size={28} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Account Successfully Registered in Supabase!
+              </h3>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
+                Your account for <strong className="text-slate-900 dark:text-white font-mono">{signupSuccess.email}</strong> is now created in Supabase Authentication.
+              </p>
+              {signupSuccess.requiresConfirmation && (
+                <div className="text-left bg-white/80 dark:bg-slate-900/80 p-3.5 rounded-xl border border-emerald-200/80 dark:border-emerald-800/80 text-xs text-slate-600 dark:text-slate-300 space-y-1.5 mb-4">
+                  <div className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                    <ShieldCheck size={14} /> Next Step:
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Check your email inbox for the Supabase confirmation link to verify your email, or if your project has &quot;Confirm email&quot; disabled, you can log in right now.
+                  </p>
+                </div>
+              )}
+              <Link
+                href="/login"
+                id="signup-success-login-btn"
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+              >
+                <span>Proceed to Sign In</span>
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          ) : (
+            <form onSubmit={handleSignup} className="login-form space-y-4">
             
             {/* Username & Full Name Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -575,6 +572,7 @@ export default function SignupPage() {
               )}
             </button>
           </form>
+          )}
 
           {/* Error Message Under Form */}
           {error && (

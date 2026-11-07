@@ -4,38 +4,22 @@ import { useState, Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '@/src/supabaseClient'
-import { isDemoMode } from '@/lib/supabase/demo-db'
+import { createClient } from '@/lib/supabase/client'
 import { 
   Mail, Lock, Eye, EyeOff, Sparkles, ArrowRight, ArrowLeft, 
-  BookOpen, Trophy, Users, Star, Sun, Moon, ShieldCheck, Check, GraduationCap, Award
+  BookOpen, Trophy, Users, Star, Sun, Moon, ShieldCheck, Check, GraduationCap
 } from 'lucide-react'
 import { Logo } from '@/components/layout/Logo'
 
 const DEMO_ACCOUNTS = [
   { 
-    role: 'Student Learner', 
-    email: 'student@vidyasetu.com', 
-    badge: 'Standard Access',
-    desc: 'Library, MCQs, timed quizzes & bookmarks',
+    role: 'Verified Student Learner', 
+    email: 'testuser123@gmail.com', 
+    password: 'password123',
+    badge: 'Supabase Live',
+    desc: 'Registered account in Supabase Authentication Users table',
     icon: GraduationCap,
     color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/70 border-indigo-200 dark:border-indigo-800'
-  },
-  { 
-    role: 'Content Contributor', 
-    email: 'contributor@vidyasetu.com', 
-    badge: 'Creator Portal',
-    desc: 'Upload notes, solved papers & monitor analytics',
-    icon: Award,
-    color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/70 border-purple-200 dark:border-purple-800'
-  },
-  { 
-    role: 'System Administrator', 
-    email: 'admin@vidyasetu.com', 
-    badge: 'Full Oversight',
-    desc: 'Review submissions, manage users & reports',
-    icon: ShieldCheck,
-    color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/70 border-blue-200 dark:border-blue-800'
   },
 ]
 
@@ -80,6 +64,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnUrl = searchParams.get('returnUrl') || '/'
+  const supabase = createClient()
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -108,25 +93,20 @@ function LoginForm() {
   const resolveEmail = async (rawInput: string): Promise<string> => {
     const trimmed = rawInput.trim().toLowerCase()
     if (trimmed.includes('@')) return trimmed
-    
-    // Quick demo username alias support
-    if (trimmed === 'student' || trimmed === 'student2081') return 'student@vidyasetu.com'
-    if (trimmed === 'admin') return 'admin@vidyasetu.com'
-    if (trimmed === 'contributor') return 'contributor@vidyasetu.com'
 
-    // Try finding email from public.users by username
+    // Lookup registered user in Supabase public.users by username or fullname
     try {
       const { data } = await supabase
         .from('users')
         .select('email')
-        .eq('username', trimmed)
-        .single()
+        .ilike('full_name', trimmed)
+        .limit(1)
+        .maybeSingle()
       if (data?.email) return data.email
     } catch {
       // ignore
     }
 
-    // Default fallback
     return trimmed
   }
 
@@ -137,9 +117,96 @@ function LoginForm() {
 
     try {
       const targetEmail = await resolveEmail(identifier)
-      const { error: err } = await supabase.auth.signInWithPassword({ 
+      // Clear any legacy demo cookie so real Supabase session is strictly used
+      try {
+        document.cookie = 'vs-demo-user=; path=/; max-age=0'
+        localStorage.removeItem('vs-demo-user')
+      } catch {}
+
+      const { data, error: err } = await supabase.auth.signInWithPassword({ 
         email: targetEmail, 
         password 
+      })
+
+      if (err) {
+        if (err.message.toLowerCase().includes('email not confirmed')) {
+          setError('Email not confirmed: Please check your inbox for the confirmation link from Supabase, or turn off "Confirm email" in your Supabase dashboard (Authentication -> Providers -> Email).')
+        } else if (err.message.toLowerCase().includes('invalid login credentials')) {
+          setError('Invalid login credentials: Check your email and password, or create a new account below.')
+        } else {
+          setError(err.message)
+        }
+        setLoading(false)
+        return
+      }
+
+      setLoading(false)
+      // Fetch user role for proper redirection
+      if (data?.user) {
+        const { data: profile } = await supabase.from('users').select('role').eq('id', data.user.id).single()
+        router.push(profile?.role === 'admin' ? '/admin' : returnUrl)
+      } else {
+        router.push(returnUrl)
+      }
+      router.refresh()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to sign in. Please check your credentials.'
+      setError(msg)
+      setLoading(false)
+    }
+  }
+
+  const handleGoogle = async () => {
+    if (googleLoading) return
+    setGoogleLoading(true)
+    setError(null)
+
+    try {
+      const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent(returnUrl || '/')}`
+      const { data, error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: callbackUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          },
+        },
+      })
+
+      if (err) {
+        setError(err.message || 'Failed to start Google sign-in.')
+        setGoogleLoading(false)
+        return
+      }
+
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        setError('No authorization URL returned from Supabase.')
+        setGoogleLoading(false)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google authentication could not be completed.'
+      setError(msg)
+      setGoogleLoading(false)
+    }
+  }
+
+  const handleDemoLogin = async (targetEmail: string, targetPass = 'password123') => {
+    setError(null)
+    setLoading(true)
+    setIdentifier(targetEmail)
+    setPassword(targetPass)
+    try {
+      try {
+        document.cookie = 'vs-demo-user=; path=/; max-age=0'
+        localStorage.removeItem('vs-demo-user')
+      } catch {}
+
+      const { error: err } = await supabase.auth.signInWithPassword({ 
+        email: targetEmail, 
+        password: targetPass 
       })
 
       if (err) {
@@ -149,116 +216,12 @@ function LoginForm() {
       }
 
       setLoading(false)
-      router.push(targetEmail === 'admin@vidyasetu.com' ? '/admin' : returnUrl)
+      router.push(returnUrl || '/dashboard')
       router.refresh()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to sign in. Please check your credentials.'
-      setError(msg)
+      setError(err instanceof Error ? err.message : 'Sign in failed')
       setLoading(false)
     }
-  }
-
-  // Listen for OAuth completion from popup
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        setGoogleLoading(false)
-        router.push(event.data.returnUrl || '/')
-        router.refresh()
-      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-        setGoogleLoading(false)
-        setError(event.data.error || 'Google authentication could not be completed.')
-      }
-    }
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
-  }, [router])
-
-  // Safety timeout: reset loading if popup or redirection takes too long
-  useEffect(() => {
-    if (!googleLoading) return
-    const timer = setTimeout(() => {
-      setGoogleLoading(false)
-    }, 12000)
-    return () => clearTimeout(timer)
-  }, [googleLoading])
-
-  const handleGoogle = async () => {
-    if (googleLoading) return
-    setGoogleLoading(true)
-    setError(null)
-
-    try {
-      if (isDemoMode()) {
-        await supabase.auth.signInWithOAuth({ provider: 'google' })
-        setGoogleLoading(false)
-        router.push(returnUrl || '/')
-        router.refresh()
-        return
-      }
-
-      let authWindow: Window | null = null
-      try {
-        authWindow = window.open('about:blank', 'supabase_oauth', 'width=540,height=680,menubar=no,toolbar=no')
-      } catch {
-        // fallback
-      }
-
-      const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent('/')}`
-      const { data, error: err } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: callbackUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      })
-
-      if (err || !data?.url) {
-        if (authWindow) authWindow.close()
-        await supabase.auth.signInWithPassword({ email: 'student@vidyasetu.com', password: 'demo1234' })
-        setGoogleLoading(false)
-        router.push(returnUrl || '/')
-        router.refresh()
-        return
-      }
-
-      if (authWindow && !authWindow.closed) {
-        authWindow.location.href = data.url
-        const timer = setInterval(() => {
-          if (authWindow?.closed) {
-            clearInterval(timer)
-            setGoogleLoading(false)
-            supabase.auth.getSession().then(({ data: s }) => {
-              if (s?.session) {
-                router.push(returnUrl || '/')
-                router.refresh()
-              }
-            })
-          }
-        }, 1000)
-      } else {
-        window.location.href = data.url
-      }
-    } catch {
-      await supabase.auth.signInWithPassword({ email: 'student@vidyasetu.com', password: 'demo1234' })
-      setGoogleLoading(false)
-      router.push(returnUrl || '/')
-      router.refresh()
-    }
-  }
-
-  const handleDemoLogin = async (targetEmail: string) => {
-    setError(null)
-    setLoading(true)
-    setIdentifier(targetEmail)
-    setPassword('demo1234')
-    await supabase.auth.signInWithPassword({ email: targetEmail, password: 'demo1234' })
-    setLoading(false)
-    router.push(targetEmail === 'admin@vidyasetu.com' ? '/admin' : returnUrl)
-    router.refresh()
   }
 
   return (
@@ -397,7 +360,7 @@ function LoginForm() {
                   <button
                     key={acc.email}
                     type="button"
-                    onClick={() => handleDemoLogin(acc.email)}
+                    onClick={() => handleDemoLogin(acc.email, acc.password)}
                     disabled={loading}
                     className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all text-left group"
                     suppressHydrationWarning
