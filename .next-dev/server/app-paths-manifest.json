@@ -1,3 +1,5 @@
 {
-  "/(marketing)/about/page": "app/(marketing)/about/page.js"
+  "/(student)/dashboard/page": "app/(student)/dashboard/page.js",
+  "/(student)/profile/page": "app/(student)/profile/page.js",
+  "/(marketing)/page": "app/(marketing)/page.js"
 }

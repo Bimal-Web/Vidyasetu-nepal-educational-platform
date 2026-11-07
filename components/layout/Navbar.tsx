@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Logo } from './Logo'
@@ -82,6 +82,7 @@ export function Navbar() {
   const [dark, setDark] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
   const [classesOpen, setClassesOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -106,6 +107,27 @@ export function Navbar() {
       document.body.style.overflow = ''
     }
   }, [mobileOpen])
+
+  // Close profile dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!profileOpen) return
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProfileOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('touchstart', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [profileOpen])
 
   // Scroll listener for dynamic navbar styling
   useEffect(() => {
@@ -181,11 +203,21 @@ export function Navbar() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.error('Logout error:', err)
+    }
+    try {
+      document.cookie = 'vs-demo-user=; path=/; max-age=0'
+      localStorage.removeItem('vs-demo-user')
+    } catch {}
     setUser(null)
+    setUserRole('student')
     setProfileOpen(false)
     setMobileOpen(false)
     router.push('/')
+    router.refresh()
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -464,7 +496,7 @@ export function Navbar() {
 
               {user ? (
                 /* Profile dropdown */
-                <div className="relative">
+                <div className="relative" ref={profileRef}>
                   <button
                     id="navbar-profile-btn"
                     onClick={() => setProfileOpen(p => !p)}
@@ -786,10 +818,6 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Profile menu outside click catcher */}
-      {profileOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
-      )}
     </>
   )
 }

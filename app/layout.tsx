@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'], display: 'swap' })
 export const metadata: Metadata = {
   title: 'VidyaSetu — The Bridge to Every Exam',
   description:
-    'Nepal\'s most comprehensive free digital education platform. Curated notes, past papers, MCQ practice, and timed quizzes for Secondary, Higher Secondary, Bachelor, and Loksewa exams.',
+    "Nepal's comprehensive free digital education platform with curated notes, past papers, MCQ practice, and timed quizzes for Secondary, Higher Secondary, Bachelor, and Loksewa exams.",
   keywords: ['Nepal education', 'SEE notes', 'NEB notes', 'Loksewa preparation', 'past papers Nepal', 'free study materials'],
   openGraph: {
     title: 'VidyaSetu — The Bridge to Every Exam',
