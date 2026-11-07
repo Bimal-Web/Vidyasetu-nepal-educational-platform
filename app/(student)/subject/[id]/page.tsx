@@ -8,80 +8,107 @@ import { SubjectTabs } from './SubjectTabs'
 import { SubjectBookmark } from './SubjectBookmark'
 import { Star, Users, BookOpen, ChevronRight, Sparkles, FileText, CheckCircle2, Brain } from 'lucide-react'
 import type { Metadata } from 'next'
-import { MOCK_CONTENT } from '@/lib/data/mock-data'
+import { MOCK_CONTENT, MOCK_SUBJECTS, MOCK_QUIZZES } from '@/lib/data/mock-data'
 
 interface SubjectPageProps {
   params: Promise<{ id: string }>
 }
 
 async function getData(id: string) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const [{ data: subject }, { data: content }, { data: quizzes }, { data: posts }] = await Promise.all([
-    supabase.from('subjects').select('*, faculties_or_streams(*, programs(*))').eq('id', id).single(),
-    supabase.from('content').select('*, users(full_name, avatar_url)').eq('subject_id', id).eq('status', 'approved').order('created_at', { ascending: false }),
-    supabase.from('quizzes').select('*').eq('subject_id', id).order('created_at', { ascending: false }),
-    supabase.from('discussion_posts').select('*, users(full_name, avatar_url), replies:discussion_replies(count)').eq('subject_id', id).order('created_at', { ascending: false }).limit(30),
-  ])
+    const [{ data: subject }, { data: content }, { data: quizzes }, { data: posts }] = await Promise.all([
+      supabase.from('subjects').select('*, faculties_or_streams(*, programs(*))').eq('id', id).single(),
+      supabase.from('content').select('*, users(full_name, avatar_url)').eq('subject_id', id).eq('status', 'approved').order('created_at', { ascending: false }),
+      supabase.from('quizzes').select('*').eq('subject_id', id).order('created_at', { ascending: false }),
+      supabase.from('discussion_posts').select('*, users(full_name, avatar_url), replies:discussion_replies(count)').eq('subject_id', id).order('created_at', { ascending: false }).limit(30),
+    ])
 
-  if (!subject) return null
+    if (subject) {
+      // Recommended: same-faculty subjects (excluding current), max 4
+      const { data: related } = await supabase
+        .from('subjects')
+        .select('id, name, icon_key, color_key')
+        .eq('faculty_id', subject.faculty_id)
+        .neq('id', id)
+        .order('name')
+        .limit(4)
 
-  // Recommended: same-faculty subjects (excluding current), max 4
-  const { data: related } = await supabase
-    .from('subjects')
-    .select('id, name, icon_key, color_key')
-    .eq('faculty_id', subject.faculty_id)
-    .neq('id', id)
-    .order('name')
-    .limit(4)
+      // Merge any registered model papers with Google Drive links for this subject
+      const fallbackItems = MOCK_CONTENT.filter(c => c.subject_id === id)
+      const existingIds = new Set((content ?? []).map(c => c.id))
+      const mergedContent = [
+        ...fallbackItems.filter(c => !existingIds.has(c.id)),
+        ...(content ?? [])
+      ]
 
-  // Merge any registered model papers with Google Drive links for this subject
+      const notes = mergedContent.filter(c => c.type === 'note')
+      const pastPapers = mergedContent.filter(c => c.type === 'past_paper')
+      const mcqSets = mergedContent.filter(c => c.type === 'mcq_set')
+
+      // Normalize discussion posts: extract the reply_count aggregate from
+      // replies:discussion_replies(count) and drop the raw count array.
+      const normalizedPosts = (posts ?? []).map((p: any) => ({
+        ...p,
+        reply_count: p.replies?.[0]?.count ?? 0,
+        replies: [],
+      }))
+
+      // Real learner + rating metrics: distinct students who downloaded this subject's content
+      // or attempted this subject's quizzes, plus their average quiz score as a rating (0–5).
+      const subjectContentIds = (content ?? []).map(c => c.id)
+      const quizIds = (quizzes ?? []).map(q => q.id)
+
+      const [{ data: dlLearners }, { data: results }] = await Promise.all([
+        supabase
+          .from('downloads_log')
+          .select('user_id')
+          .in('content_id', subjectContentIds),
+        supabase
+          .from('results')
+          .select('user_id, score')
+          .in('quiz_id', quizIds),
+      ])
+
+      const learnerSet = new Set<string>()
+      ;(dlLearners ?? []).forEach(dl => learnerSet.add(dl.user_id))
+      ;(results ?? []).forEach(r => learnerSet.add(r.user_id))
+
+      const totalStudents = Math.max(learnerSet.size, notes.length + pastPapers.length > 0 ? 1 : 0)
+      const avgScore = results?.length
+        ? results.reduce((a, r) => a + r.score, 0) / results.length
+        : 0
+      const rating = avgScore > 0 ? Number((avgScore / 20).toFixed(1)) : null
+
+      return { subject, notes, pastPapers, mcqSets, quizzes: quizzes ?? [], totalStudents, rating, posts: normalizedPosts, related: related ?? [] }
+    }
+  } catch (err) {
+    console.warn('Supabase query failed, falling back to mock subject:', err)
+  }
+
+  // Fallback to offline mock data
+  const mockSubject = MOCK_SUBJECTS.find(s => s.id === id)
+  if (!mockSubject) return null
+
+  const related = MOCK_SUBJECTS.filter(s => s.faculty_id === mockSubject.faculty_id && s.id !== id).slice(0, 4)
   const fallbackItems = MOCK_CONTENT.filter(c => c.subject_id === id)
-  const existingIds = new Set((content ?? []).map(c => c.id))
-  const mergedContent = [
-    ...fallbackItems.filter(c => !existingIds.has(c.id)),
-    ...(content ?? [])
-  ]
+  const notes = fallbackItems.filter(c => c.type === 'note')
+  const pastPapers = fallbackItems.filter(c => c.type === 'past_paper')
+  const mcqSets = fallbackItems.filter(c => c.type === 'mcq_set')
+  const mockQuizzes = (MOCK_QUIZZES as any[]).filter(q => q.subject_id === id)
 
-  const notes = mergedContent.filter(c => c.type === 'note')
-  const pastPapers = mergedContent.filter(c => c.type === 'past_paper')
-  const mcqSets = mergedContent.filter(c => c.type === 'mcq_set')
-
-  // Normalize discussion posts: extract the reply_count aggregate from
-  // replies:discussion_replies(count) and drop the raw count array.
-  const normalizedPosts = (posts ?? []).map((p: any) => ({
-    ...p,
-    reply_count: p.replies?.[0]?.count ?? 0,
-    replies: [],
-  }))
-
-  // Real learner + rating metrics: distinct students who downloaded this subject's content
-  // or attempted this subject's quizzes, plus their average quiz score as a rating (0–5).
-  const subjectContentIds = (content ?? []).map(c => c.id)
-  const quizIds = (quizzes ?? []).map(q => q.id)
-
-  const [{ data: dlLearners }, { data: results }] = await Promise.all([
-    supabase
-      .from('downloads_log')
-      .select('user_id')
-      .in('content_id', subjectContentIds),
-    supabase
-      .from('results')
-      .select('user_id, score')
-      .in('quiz_id', quizIds),
-  ])
-
-  const learnerSet = new Set<string>()
-  ;(dlLearners ?? []).forEach(dl => learnerSet.add(dl.user_id))
-  ;(results ?? []).forEach(r => learnerSet.add(r.user_id))
-
-  const totalStudents = Math.max(learnerSet.size, notes.length + pastPapers.length > 0 ? 1 : 0)
-  const avgScore = results?.length
-    ? results.reduce((a, r) => a + r.score, 0) / results.length
-    : 0
-  const rating = avgScore > 0 ? Number((avgScore / 20).toFixed(1)) : null
-
-  return { subject, notes, pastPapers, mcqSets, quizzes: quizzes ?? [], totalStudents, rating, posts: normalizedPosts, related: related ?? [] }
+  return {
+    subject: mockSubject,
+    notes,
+    pastPapers,
+    mcqSets,
+    quizzes: mockQuizzes,
+    totalStudents: 120,
+    rating: 4.8,
+    posts: [],
+    related,
+  }
 }
 
 export async function generateMetadata({ params }: SubjectPageProps): Promise<Metadata> {

@@ -5,6 +5,8 @@ import { isDemoMode } from './demo-db'
 import { createDemoServerClient } from './demo-client'
 import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from './connect'
 
+import { getAuthCookieOptions } from './cookie-options'
+
 export async function createClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies()
 
@@ -14,11 +16,13 @@ export async function createClient(): Promise<SupabaseClient> {
 
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL).replace(/\/rest\/v1\/?$/, '')
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_PUBLIC_KEY
+  const authCookieOptions = getAuthCookieOptions()
 
   return createServerClient(
     url,
     key,
     {
+      cookieOptions: authCookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -26,7 +30,11 @@ export async function createClient(): Promise<SupabaseClient> {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                ...options,
+                sameSite: authCookieOptions.sameSite,
+                secure: authCookieOptions.secure,
+              })
             )
           } catch {
             // The `setAll` method was called from a Server Component.
@@ -42,8 +50,10 @@ export async function createRealServerClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies()
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL).replace(/\/rest\/v1\/?$/, '')
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_PUBLIC_KEY
+  const authCookieOptions = getAuthCookieOptions()
 
   return createServerClient(url, key, {
+    cookieOptions: authCookieOptions,
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -51,7 +61,11 @@ export async function createRealServerClient(): Promise<SupabaseClient> {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, {
+              ...options,
+              sameSite: authCookieOptions.sameSite,
+              secure: authCookieOptions.secure,
+            })
           )
         } catch {
           // Server component setAll fallback

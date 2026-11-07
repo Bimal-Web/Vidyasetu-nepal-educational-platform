@@ -14,30 +14,51 @@ interface QuizzesPageProps {
   searchParams: Promise<{ subject?: string; q?: string }>
 }
 
+import { MOCK_SUBJECTS, MOCK_QUIZZES } from '@/lib/data/mock-data'
+
 async function getData(sp: Awaited<QuizzesPageProps['searchParams']>) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const [{ data: subjects }, { data: quizzes }] = await Promise.all([
-    supabase.from('subjects').select('id, name, icon_key, color_key').order('name').limit(100),
-    supabase
-      .from('quizzes')
-      .select('*, subjects(name, icon_key, color_key)')
-      .order('created_at', { ascending: false })
-      .limit(100),
-  ])
+    const [{ data: subjects }, { data: quizzes }] = await Promise.all([
+      supabase.from('subjects').select('id, name, icon_key, color_key').order('name').limit(100),
+      supabase
+        .from('quizzes')
+        .select('*, subjects(name, icon_key, color_key)')
+        .order('created_at', { ascending: false })
+        .limit(100),
+    ])
 
-  let list = (quizzes ?? []).filter(q => q.subjects)
-  if (sp.subject) list = list.filter(q => q.subject_id === sp.subject)
+    let list = (quizzes ?? []).filter(q => q.subjects)
+    if (sp.subject) list = list.filter(q => q.subject_id === sp.subject)
+    if (sp.q) {
+      const q = sp.q.toLowerCase()
+      list = list.filter(
+        quiz =>
+          quiz.title.toLowerCase().includes(q) ||
+          (quiz.subjects?.name ?? '').toLowerCase().includes(q)
+      )
+    }
+
+    if (subjects && subjects.length > 0 && list.length > 0) {
+      return { subjects: subjects ?? [], quizzes: list }
+    }
+  } catch (err) {
+    console.warn('Supabase query failed, falling back to mock data:', err)
+  }
+
+  let mockList = (MOCK_QUIZZES as any[]).filter(q => q.subjects)
+  if (sp.subject) mockList = mockList.filter(q => q.subject_id === sp.subject)
   if (sp.q) {
     const q = sp.q.toLowerCase()
-    list = list.filter(
+    mockList = mockList.filter(
       quiz =>
         quiz.title.toLowerCase().includes(q) ||
         (quiz.subjects?.name ?? '').toLowerCase().includes(q)
     )
   }
 
-  return { subjects: subjects ?? [], quizzes: list }
+  return { subjects: MOCK_SUBJECTS, quizzes: mockList }
 }
 
 export default async function QuizzesPage({ searchParams }: QuizzesPageProps) {

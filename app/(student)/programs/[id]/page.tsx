@@ -9,29 +9,56 @@ interface ProgramPageProps {
   params: Promise<{ id: string }>
 }
 
+import { MOCK_PROGRAMS, MOCK_FACULTIES, MOCK_SUBJECTS, MOCK_COUNTS } from '@/lib/data/mock-data'
+
 async function getData(id: string) {
-  const supabase = await createClient()
-  const { data: program } = await supabase.from('programs').select('*').eq('id', id).single()
-  if (!program) return null
+  try {
+    const supabase = await createClient()
+    const { data: program } = await supabase.from('programs').select('*').eq('id', id).single()
+    if (program) {
+      const { data: faculties } = await supabase
+        .from('faculties_or_streams')
+        .select('*, subjects(*, faculties_or_streams(*))')
+        .eq('program_id', id)
+        .order('name')
 
-  const { data: faculties } = await supabase
-    .from('faculties_or_streams')
-    .select('*, subjects(*, faculties_or_streams(*))')
-    .eq('program_id', id)
-    .order('name')
+      // Per-subject content counts
+      const subjectIds = (faculties ?? []).flatMap(f => (f.subjects ?? []).map((s: any) => s.id))
+      const { data: contentCounts } = await supabase
+        .from('content')
+        .select('subject_id, type')
+        .eq('status', 'approved')
+        .in('subject_id', subjectIds)
 
-  // Per-subject content counts
-  const subjectIds = (faculties ?? []).flatMap(f => (f.subjects ?? []).map((s: any) => s.id))
-  const { data: contentCounts } = await supabase
-    .from('content')
-    .select('subject_id, type')
-    .eq('status', 'approved')
-    .in('subject_id', subjectIds)
+      const counts: Record<string, number> = {}
+      ;(contentCounts ?? []).forEach(c => { counts[c.subject_id] = (counts[c.subject_id] ?? 0) + 1 })
+
+      return { program, faculties: faculties ?? [], counts }
+    }
+  } catch (err) {
+    console.warn('Supabase query failed, falling back to mock data:', err)
+  }
+
+  // Fallback to offline mock data
+  const mockProgram = MOCK_PROGRAMS.find(p => p.id === id)
+  if (!mockProgram) return null
+
+  const mockFaculties = MOCK_FACULTIES
+    .filter(f => f.program_id === id)
+    .map(f => ({
+      ...f,
+      subjects: MOCK_SUBJECTS.filter(s => s.faculty_id === f.id)
+    }))
 
   const counts: Record<string, number> = {}
-  ;(contentCounts ?? []).forEach(c => { counts[c.subject_id] = (counts[c.subject_id] ?? 0) + 1 })
+  mockFaculties.forEach(f => {
+    (f.subjects || []).forEach(s => {
+      const c = MOCK_COUNTS[s.id]
+      counts[s.id] = c ? (c.notes + c.papers + c.mcqs) : 1
+    })
+  })
 
-  return { program, faculties: faculties ?? [], counts }
+  return { program: mockProgram, faculties: mockFaculties, counts }
 }
 
 export async function generateMetadata({ params }: ProgramPageProps): Promise<Metadata> {

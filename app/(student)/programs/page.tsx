@@ -8,13 +8,29 @@ export const metadata: Metadata = {
   description: 'Browse all academic programs and faculties on VidyaSetu.',
 }
 
+import { MOCK_PROGRAMS, MOCK_FACULTIES } from '@/lib/data/mock-data'
+
 export default async function ProgramsPage() {
-  const supabase = await createClient()
-  const { data: programs } = await supabase.from('programs').select('*').order('level_order')
-  const { data: faculties } = await supabase
-    .from('faculties_or_streams')
-    .select('*, programs(name)')
-    .order('name')
+  let programs = MOCK_PROGRAMS
+  let faculties = MOCK_FACULTIES
+
+  try {
+    const supabase = await createClient()
+    const { data: dbPrograms } = await supabase.from('programs').select('*').order('level_order')
+    const { data: dbFaculties } = await supabase
+      .from('faculties_or_streams')
+      .select('*, programs(name)')
+      .order('name')
+
+    if (dbPrograms && dbPrograms.length > 0) {
+      programs = dbPrograms
+    }
+    if (dbFaculties && dbFaculties.length > 0) {
+      faculties = dbFaculties
+    }
+  } catch (err) {
+    console.warn('Supabase query failed, falling back to mock data:', err)
+  }
 
   const facultyByProgram: Record<string, any[]> = {}
   ;(faculties ?? []).forEach(f => {

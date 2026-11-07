@@ -136,42 +136,224 @@ export default function SignupPage() {
     }
   }
 
+  // Returns whether current execution is inside an iframe
+  const isRunningInIframe = () => {
+    if (typeof window === 'undefined') return false
+    try {
+      return window.self !== window.top
+    } catch {
+      return true
+    }
+  }
+
   // Listen for OAuth completion from popup
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+    const handleMessage = async (event: MessageEvent) => {
+      // Strict origin verification: only accept messages from our exact app origin
+      if (event.origin !== window.location.origin) {
+        return
+      }
+
+      if (!event.data || typeof event.data !== 'object') {
+        return
+      }
+
+      if (event.data.type === 'OAUTH_AUTH_SUCCESS') {
         setGoogleLoading(false)
-        router.push(event.data.returnUrl || '/')
+
+        if (event.data.session) {
+          try {
+            await supabase.auth.setSession({
+              access_token: event.data.session.access_token,
+              refresh_token: event.data.session.refresh_token,
+            })
+          } catch (syncErr) {
+            console.warn('Session sync warning:', syncErr)
+          }
+        }
+
+        const targetUrl = event.data.returnUrl || '/dashboard'
+        router.push(targetUrl)
         router.refresh()
-      } else if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+      } else if (event.data.type === 'OAUTH_AUTH_CODE') {
+        // Fallback: client-side PKCE exchange
+        try {
+          const { error: codeErr } = await supabase.auth.exchangeCodeForSession(event.data.code)
+          if (!codeErr) {
+            setGoogleLoading(false)
+            router.push(event.data.returnUrl || '/dashboard')
+            router.refresh()
+            return
+          }
+        } catch (codeExErr) {
+          console.warn('Client code exchange warning:', codeExErr)
+        }
         setGoogleLoading(false)
-        setError(event.data.error || 'Google authentication could not be completed.')
+        router.push(event.data.returnUrl || '/dashboard')
+        router.refresh()
+      } else if (event.data.type === 'OAUTH_AUTH_ERROR') {
+        setGoogleLoading(false)
+        const rawErr = event.data.error || 'Google authentication could not be completed.'
+        const lower = rawErr.toLowerCase()
+        if (
+          lower.includes('already registered') ||
+          lower.includes('identity') ||
+          lower.includes('user already exists')
+        ) {
+          // Supabase automatic identity linking explanation:
+          // When a user originally registered with an email & password, Supabase creates an identity.
+          // If automatic OAuth linking is not enabled, Supabase prevents overwriting the existing identity.
+          // Prompt the user to log in with their password or use Google with the same email.
+          setError('This email is already registered. Log in with your password, or use Google with the same email')
+        } else {
+          setError(rawErr)
+        }
       }
     }
+
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [router])
+  }, [router, supabase])
 
-  // Safety timeout: reset loading if redirection takes more than 15 seconds
+  // Check URL parameters for errors
   useEffect(() => {
-    if (!googleLoading) return
-    const timer = setTimeout(() => {
-      setGoogleLoading(false)
-    }, 15000)
-    return () => clearTimeout(timer)
-  }, [googleLoading])
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const urlErr = params.get('error')
+    const urlDesc = params.get('error_description')
+    if (urlErr || urlDesc) {
+      const raw = decodeURIComponent(urlDesc || urlErr || '')
+      const lower = raw.toLowerCase()
+      if (
+        lower.includes('already registered') ||
+        lower.includes('identity') ||
+        lower.includes('user already exists')
+      ) {
+        setError('This email is already registered. Log in with your password, or use Google with the same email')
+      } else {
+        setError(raw)
+      }
+    }
+  }, [])
 
-  const handleGoogle = async () => {
-    if (googleLoading) return
-    setGoogleLoading(true)
+  const handleGoogle = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    if (googleLoading || loading) return
     setError(null)
+    setGoogleLoading(true)
+
+    const inIframe = isRunningInIframe()
+    const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent('/dashboard')}`
+
+    // If NOT in iframe (normal browser tab or production domain):
+    // Use the standard supabase.auth.signInWithOAuth redirect flow and exchange code on server
+    if (!inIframe) {
+      try {
+        const { error: err } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: callbackUrl,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'select_account',
+            },
+          },
+        })
+        if (err) {
+          setError(err.message || 'Failed to start Google sign-up.')
+          setGoogleLoading(false)
+        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Google sign-up could not be initiated.')
+        setGoogleLoading(false)
+      }
+      return
+    }
+
+    // Inside iframe: use popup flow to avoid X-Frame-Options DENY
+    const width = 500
+    const height = 650
+    const left = window.screenX + (window.outerWidth - width) / 2
+    const top = window.screenY + (window.outerHeight - height) / 2
+    let popup: Window | null = null
 
     try {
-      const callbackUrl = `${window.location.origin}/api/auth/callback?returnUrl=${encodeURIComponent('/')}`
+      popup = window.open(
+        'about:blank',
+        'supabase_google_oauth',
+        `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes,scrollbars=yes`
+      )
+    } catch {
+      popup = null
+    }
+
+    // Fall back to redirect if popup was blocked
+    if (!popup) {
+      setError('Popups were blocked by your browser. Please allow popups for VidyaSetu, or continuing via direct redirect...')
+      try {
+        await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: callbackUrl,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'select_account',
+            },
+          },
+        })
+      } catch {
+        setGoogleLoading(false)
+      }
+      return
+    }
+
+    try {
+      popup.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Connecting to Google — VidyaSetu</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body style="font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0f172a;color:#94a3b8;">
+            <div style="text-align:center;padding:24px;">
+              <div style="width:36px;height:36px;border:3px solid #6366f1;border-top-color:transparent;border-radius:50%;margin:0 auto 16px auto;animation:spin 1s linear infinite;"></div>
+              <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+              <p style="font-size:15px;color:#f8fafc;margin:0 0 6px 0;font-weight:600;">Connecting to Google…</p>
+              <p style="font-size:12px;margin:0;color:#64748b;">Please select your Google Account in this window</p>
+            </div>
+          </body>
+        </html>
+      `)
+    } catch {}
+
+    // 60-second timeout to always reset loading state
+    const timeoutTimer = setTimeout(() => {
+      setGoogleLoading(false)
+      if (popup && !popup.closed) {
+        try { popup.close() } catch {}
+      }
+    }, 60000)
+
+    // Monitor if user closes popup manually
+    const pollTimer = setInterval(() => {
+      if (popup?.closed) {
+        clearInterval(pollTimer)
+        clearTimeout(timeoutTimer)
+        setGoogleLoading(false)
+      }
+    }, 800)
+
+    try {
       const { data, error: err } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { 
           redirectTo: callbackUrl,
+          skipBrowserRedirect: true,
           queryParams: {
             access_type: 'offline',
             prompt: 'select_account',
@@ -180,18 +362,33 @@ export default function SignupPage() {
       })
 
       if (err) {
+        clearInterval(pollTimer)
+        clearTimeout(timeoutTimer)
+        if (popup && !popup.closed) popup.close()
         setError(err.message || 'Failed to start Google sign-up.')
         setGoogleLoading(false)
         return
       }
 
       if (data?.url) {
-        window.location.href = data.url
+        if (popup && !popup.closed) {
+          popup.location.href = data.url
+        } else {
+          clearInterval(pollTimer)
+          clearTimeout(timeoutTimer)
+          window.location.href = data.url
+        }
       } else {
+        clearInterval(pollTimer)
+        clearTimeout(timeoutTimer)
+        if (popup && !popup.closed) popup.close()
         setError('No authorization URL returned from Supabase.')
         setGoogleLoading(false)
       }
     } catch (err: unknown) {
+      clearInterval(pollTimer)
+      clearTimeout(timeoutTimer)
+      if (popup && !popup.closed) popup.close()
       const msg = err instanceof Error ? err.message : 'Google authentication could not be completed.'
       setError(msg)
       setGoogleLoading(false)
@@ -339,7 +536,7 @@ export default function SignupPage() {
           {/* Google One-Click OAuth */}
           <button 
             id="signup-google-btn" 
-            onClick={handleGoogle} 
+            onClick={(e) => handleGoogle(e)} 
             disabled={googleLoading || loading}
             type="button"
             className="login-google-btn group"
